@@ -5,8 +5,11 @@ Public Helm charts for installing DemirTech products on Kubernetes.
 ## Repository layout
 
 Each chart lives at `charts/<chart>/` and owns its templates, defaults,
-`values.schema.json`, tests, and documentation. The collection is intentionally
-empty until the first chart is reviewed.
+`values.schema.json`, tests, and documentation.
+
+| Chart | Description |
+| --- | --- |
+| [Infegate](charts/infegate/README.md) | Standalone Infegate web interface |
 
 ## Validation
 
@@ -16,8 +19,8 @@ actionlint .github/workflows/*.yaml
 ```
 
 The chart check discovers every `Chart.yaml`, then runs strict Helm linting,
-template rendering, values schema validation, and kubeconform. An empty chart
-collection is valid.
+template rendering, values schema validation, chart-specific contract tests,
+and kubeconform.
 
 ## OCI releases
 

@@ -1,0 +1,5 @@
+Infegate is available inside the cluster at:
+
+  http://{{ include "infegate.fullname" . }}.{{ .Release.Namespace }}.svc:{{ .Values.service.port }}/ui/
+
+Route only /ui and /ui/* to this Service. Route gateway API paths to agentgateway.

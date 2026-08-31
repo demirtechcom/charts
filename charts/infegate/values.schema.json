@@ -1,0 +1,173 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Infegate chart values",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "replicaCount": {
+      "description": "Number of Infegate UI replicas.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "image": {
+      "description": "Infegate container image configuration.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "tag", "digest", "pullPolicy"],
+      "properties": {
+        "repository": {
+          "description": "Image repository or offline mirror path.",
+          "type": "string",
+          "minLength": 1
+        },
+        "tag": {
+          "description": "Image tag; an empty value uses Chart.appVersion.",
+          "type": "string"
+        },
+        "digest": {
+          "description": "Immutable sha256 image digest; overrides tag when set.",
+          "oneOf": [
+            { "const": "" },
+            { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+          ]
+        },
+        "pullPolicy": {
+          "description": "Kubernetes image pull policy.",
+          "type": "string",
+          "enum": ["Always", "IfNotPresent", "Never"]
+        }
+      }
+    },
+    "imagePullSecrets": {
+      "description": "Names of existing image pull Secrets.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "nameOverride": {
+      "description": "Override the chart name used in resource names.",
+      "type": "string"
+    },
+    "fullnameOverride": {
+      "description": "Override the complete resource name.",
+      "type": "string"
+    },
+    "serviceAccount": {
+      "description": "ServiceAccount configuration.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["create", "annotations", "name"],
+      "properties": {
+        "create": {
+          "description": "Create a dedicated ServiceAccount.",
+          "type": "boolean"
+        },
+        "annotations": {
+          "description": "Annotations added to the ServiceAccount.",
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "name": {
+          "description": "Existing or created ServiceAccount name override.",
+          "type": "string"
+        }
+      }
+    },
+    "podAnnotations": {
+      "description": "Annotations added to Infegate pods.",
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "podLabels": {
+      "description": "Additional non-selector labels added to Infegate pods.",
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "podSecurityContext": {
+      "description": "Pod-level Kubernetes security context.",
+      "type": "object"
+    },
+    "securityContext": {
+      "description": "Infegate container security context.",
+      "type": "object"
+    },
+    "service": {
+      "description": "Infegate Service configuration.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "port"],
+      "properties": {
+        "type": {
+          "description": "Kubernetes Service type.",
+          "type": "string",
+          "enum": ["ClusterIP", "NodePort", "LoadBalancer"]
+        },
+        "port": {
+          "description": "Service port that targets the named HTTP container port.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        }
+      }
+    },
+    "readinessProbe": {
+      "$ref": "#/definitions/probe",
+      "description": "Readiness probe timing for /healthz."
+    },
+    "livenessProbe": {
+      "$ref": "#/definitions/probe",
+      "description": "Liveness probe timing for /healthz."
+    },
+    "resources": {
+      "description": "Kubernetes resource requests and limits.",
+      "type": "object"
+    },
+    "revisionHistoryLimit": {
+      "description": "Number of old ReplicaSets retained for rollback.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "priorityClassName": {
+      "description": "Existing Kubernetes PriorityClass name.",
+      "type": "string"
+    },
+    "nodeSelector": {
+      "description": "Node labels required for pod scheduling.",
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "tolerations": {
+      "description": "Kubernetes pod tolerations.",
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "affinity": {
+      "description": "Kubernetes pod affinity rules.",
+      "type": "object"
+    },
+    "topologySpreadConstraints": {
+      "description": "Kubernetes topology spread constraints.",
+      "type": "array",
+      "items": { "type": "object" }
+    }
+  },
+  "definitions": {
+    "probe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["initialDelaySeconds", "periodSeconds", "timeoutSeconds", "failureThreshold"],
+      "properties": {
+        "initialDelaySeconds": { "type": "integer", "minimum": 0 },
+        "periodSeconds": { "type": "integer", "minimum": 1 },
+        "timeoutSeconds": { "type": "integer", "minimum": 1 },
+        "failureThreshold": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

@@ -5,6 +5,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 concurrency:
   group: check-${{ github.ref }}
@@ -12,13 +13,34 @@ concurrency:
 
 jobs:
   charts:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4
         with:
           version: v3.18.4
       - name: Validate charts
         run: ./scripts/check-charts.sh
+      - name: Run chart-testing
+        run: |
+          docker run --rm \
+            --env GIT_CONFIG_COUNT=1 \
+            --env GIT_CONFIG_KEY_0=safe.directory \
+            --env GIT_CONFIG_VALUE_0=/workdir \
+            --volume "${PWD}:/workdir" \
+            --workdir /workdir \
+            quay.io/helmpack/chart-testing:v3.13.0 \
+            ct lint --config ct.yaml
+      - name: Install kind
+        run: |
+          mkdir -p "${RUNNER_TEMP}/bin"
+          GOBIN="${RUNNER_TEMP}/bin" go install sigs.k8s.io/kind@v0.30.0
+          echo "${RUNNER_TEMP}/bin" >> "${GITHUB_PATH}"
+      - name: Smoke test Infegate chart
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USERNAME: ${{ github.actor }}
+        run: scripts/smoke-infegate-chart.sh

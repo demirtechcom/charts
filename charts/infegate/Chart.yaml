@@ -1,0 +1,14 @@
+apiVersion: v2
+name: infegate
+description: Standalone DemirTech Infegate user interface
+type: application
+version: 0.1.0
+appVersion: "1.4.1-1"
+home: https://infegate.com
+sources:
+  - https://github.com/demirtechcom/infegate
+maintainers:
+  - name: DemirTech
+    url: https://demirtech.com
+annotations:
+  licenses: Apache-2.0
