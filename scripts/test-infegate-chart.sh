@@ -56,6 +56,7 @@ for workflow in .github/workflows/check.yaml .github/workflows/release.yaml; do
   grep -Fq "runs-on: \${{ vars.CI_RUNNER || 'ubuntu-latest' }}" "${workflow}"
 done
 grep -Fq 'ct lint --config ct.yaml' .github/workflows/check.yaml
+grep -Fq 'packages: read' .github/workflows/check.yaml
 grep -Fq 'GIT_CONFIG_VALUE_0=/workdir' .github/workflows/check.yaml
 grep -Fq 'scripts/smoke-infegate-chart.sh' .github/workflows/check.yaml
 if grep -Fq '  --wait' scripts/smoke-infegate-chart.sh; then
