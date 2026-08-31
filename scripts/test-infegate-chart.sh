@@ -4,6 +4,20 @@ set -eu
 readonly chart=charts/infegate
 readonly work_dir="$(mktemp -d)"
 
+for heading in \
+  "## Install" \
+  "## Image digest pinning" \
+  "## Ingress routing" \
+  "## Private registries and offline mirrors" \
+  "## Upgrade" \
+  "## Rollback"
+do
+  grep -Fqx "$heading" "${chart}/README.md" || {
+    echo "chart README must contain: $heading" >&2
+    exit 1
+  }
+done
+
 cleanup() {
   rm -rf "${work_dir}"
 }
