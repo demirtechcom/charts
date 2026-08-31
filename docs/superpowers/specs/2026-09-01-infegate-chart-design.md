@@ -16,7 +16,6 @@ The chart renders these namespaced resources:
 - ServiceAccount with API token automount disabled
 - Deployment running the Infegate Nginx image on container port `8080`
 - ClusterIP Service exposing port `80`
-- optional PodDisruptionBudget using `maxUnavailable`, never `minAvailable`
 
 Ingress is deliberately excluded. The environment owner must route `/ui` and
 `/ui/*` to the Infegate Service while routing `/api`, `/cel`, and other gateway
@@ -59,9 +58,10 @@ without being restarted during normal startup.
 ## Availability and resources
 
 The default replica count is two because the UI is stateless and is expected to
-remain available during a voluntary disruption. The optional PDB is enabled by
-default with `maxUnavailable: 1`, which remains drain-safe if an operator scales
-the Deployment down to one replica.
+remain available during ordinary rollout and node maintenance. The first chart
+does not render a PodDisruptionBudget. Adding policy and values for a disruption
+budget without a demonstrated operational need would expand the public contract
+without improving the initial installation.
 
 Resource requests and limits are configurable but empty by default. The chart
 does not invent capacity values without measurements. It also excludes an HPA;
@@ -123,6 +123,7 @@ published.
 - Ingress or Gateway API resources
 - Secrets or registry credentials
 - HorizontalPodAutoscaler
+- PodDisruptionBudget
 - NetworkPolicy with environment-specific selectors
 - Kubernetes installation or production deployment
 - Helm umbrella chart
