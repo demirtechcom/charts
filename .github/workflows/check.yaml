@@ -26,6 +26,9 @@ jobs:
       - name: Run chart-testing
         run: |
           docker run --rm \
+            --env GIT_CONFIG_COUNT=1 \
+            --env GIT_CONFIG_KEY_0=safe.directory \
+            --env GIT_CONFIG_VALUE_0=/workdir \
             --volume "${PWD}:/workdir" \
             --workdir /workdir \
             quay.io/helmpack/chart-testing:v3.13.0 \
