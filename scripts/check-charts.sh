@@ -17,6 +17,11 @@ while IFS= read -r chart_file; do
       -strict \
       -summary \
       -ignore-missing-schemas
+
+  chart_test="./scripts/test-${chart_name}-chart.sh"
+  if test -x "${chart_test}"; then
+    "${chart_test}"
+  fi
 done
 
 if ! find charts -mindepth 2 -maxdepth 2 -name Chart.yaml -print -quit | grep -q .; then

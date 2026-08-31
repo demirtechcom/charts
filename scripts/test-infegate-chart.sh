@@ -27,3 +27,13 @@ if grep -q 'image: "ghcr.io/demirtechcom/infegate:1.4.1-1"' "${work_dir}/digest.
   echo "digest-pinned render must not use the image tag" >&2
   exit 1
 fi
+
+if helm template infegate "${chart}" --set replicaCount=0 >/dev/null 2>&1; then
+  echo "replicaCount=0 must fail schema validation" >&2
+  exit 1
+fi
+
+if helm template infegate "${chart}" --set-string image.digest=sha256:bad >/dev/null 2>&1; then
+  echo "malformed image digest must fail schema validation" >&2
+  exit 1
+fi
