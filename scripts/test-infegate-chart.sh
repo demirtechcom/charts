@@ -37,3 +37,10 @@ if helm template infegate "${chart}" --set-string image.digest=sha256:bad >/dev/
   echo "malformed image digest must fail schema validation" >&2
   exit 1
 fi
+
+for workflow in .github/workflows/check.yaml .github/workflows/release.yaml; do
+  grep -Fq "runs-on: \${{ vars.CI_RUNNER || 'ubuntu-latest' }}" "${workflow}"
+done
+grep -Fq 'ct lint --config ct.yaml' .github/workflows/check.yaml
+grep -Fq 'scripts/smoke-infegate-chart.sh' .github/workflows/check.yaml
+grep -Fq 'tags:' .github/workflows/release.yaml
