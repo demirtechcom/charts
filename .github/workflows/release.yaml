@@ -1,0 +1,64 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "*-v*"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  chart:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4
+        with:
+          version: v3.18.4
+      - name: Resolve and verify chart
+        id: chart
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          chart_name="${RELEASE_TAG%-v*}"
+          chart_version="${RELEASE_TAG##*-v}"
+          chart_dir="charts/${chart_name}"
+          test -f "${chart_dir}/Chart.yaml"
+          actual_name="$(helm show chart "${chart_dir}" | awk '$1 == "name:" { print $2 }')"
+          actual_version="$(helm show chart "${chart_dir}" | awk '$1 == "version:" { print $2 }')"
+          test "${actual_name}" = "${chart_name}"
+          test "${actual_version}" = "${chart_version}"
+          {
+            echo "name=${chart_name}"
+            echo "version=${chart_version}"
+            echo "directory=${chart_dir}"
+          } >> "$GITHUB_OUTPUT"
+      - name: Validate chart
+        run: ./scripts/check-charts.sh
+      - name: Authenticate to GHCR
+        env:
+          HELM_REGISTRY_CONFIG: ${{ runner.temp }}/helm-registry.json
+          REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$REGISTRY_PASSWORD" | helm registry login ghcr.io --username "${{ github.actor }}" --password-stdin
+      - name: Package chart
+        env:
+          CHART_DIRECTORY: ${{ steps.chart.outputs.directory }}
+        run: helm package "$CHART_DIRECTORY" --destination "${{ runner.temp }}"
+      - name: Refuse an existing release
+        env:
+          CHART_NAME: ${{ steps.chart.outputs.name }}
+          CHART_VERSION: ${{ steps.chart.outputs.version }}
+          HELM_REGISTRY_CONFIG: ${{ runner.temp }}/helm-registry.json
+        run: '! helm show chart "oci://ghcr.io/demirtechcom/charts/${CHART_NAME}" --version "$CHART_VERSION"'
+      - name: Publish chart
+        env:
+          CHART_NAME: ${{ steps.chart.outputs.name }}
+          CHART_VERSION: ${{ steps.chart.outputs.version }}
+          HELM_REGISTRY_CONFIG: ${{ runner.temp }}/helm-registry.json
+        run: helm push "${{ runner.temp }}/${CHART_NAME}-${CHART_VERSION}.tgz" oci://ghcr.io/demirtechcom/charts
