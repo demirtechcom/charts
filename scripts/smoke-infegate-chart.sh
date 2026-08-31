@@ -29,13 +29,12 @@ kubectl create secret docker-registry infegate-registry \
 
 helm upgrade --install infegate charts/infegate \
   --namespace "${namespace}" \
-  --set 'imagePullSecrets[0].name=infegate-registry' \
-  --wait \
-  --timeout 5m
+  --set 'imagePullSecrets[0].name=infegate-registry'
 
 if ! kubectl rollout status deployment/infegate --namespace "${namespace}" --timeout 3m; then
   kubectl get all --namespace "${namespace}"
   kubectl describe pods --namespace "${namespace}"
+  kubectl get events --namespace "${namespace}" --sort-by=.lastTimestamp
   exit 1
 fi
 

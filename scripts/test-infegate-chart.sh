@@ -58,4 +58,8 @@ done
 grep -Fq 'ct lint --config ct.yaml' .github/workflows/check.yaml
 grep -Fq 'GIT_CONFIG_VALUE_0=/workdir' .github/workflows/check.yaml
 grep -Fq 'scripts/smoke-infegate-chart.sh' .github/workflows/check.yaml
+if grep -Fq '  --wait' scripts/smoke-infegate-chart.sh; then
+  echo "smoke test must use rollout status as its only workload wait" >&2
+  exit 1
+fi
 grep -Fq 'tags:' .github/workflows/release.yaml
