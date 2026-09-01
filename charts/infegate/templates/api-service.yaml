@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "infegate.componentName" (dict "root" . "component" "api") }}
+  labels:
+    {{- include "infegate.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "infegate.selectorLabels" (dict "root" . "component" "api") | nindent 4 }}
+  ports:
+    - name: llm
+      port: 3000
+      targetPort: llm
+    - name: management
+      port: 4000
+      targetPort: management
+    - name: readiness
+      port: 15021
+      targetPort: readiness
+    {{- if .Values.api.subscriptionPassthrough.providers.claude.enabled }}
+    - name: subscriptions
+      port: 3001
+      targetPort: subscriptions
+    {{- end }}

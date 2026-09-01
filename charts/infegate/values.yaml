@@ -1,56 +1,75 @@
-replicaCount: 2
-
-image:
-  repository: ghcr.io/demirtechcom/infegate
-  tag: ""
-  digest: ""
-  pullPolicy: IfNotPresent
-
-imagePullSecrets: []
+publicUrl: ""
 nameOverride: ""
 fullnameOverride: ""
+imagePullSecrets: []
 
 serviceAccount:
   create: true
   annotations: {}
   name: ""
 
-podAnnotations: {}
-podLabels: {}
+api:
+  replicaCount: 2
+  image:
+    repository: ghcr.io/demirtechcom/infegate/gateway
+    tag: "1.0.0"
+    digest: ""
+    pullPolicy: IfNotPresent
+  database:
+    existingSecret: ""
+    key: uri
+    maxConnections: 5
+  oidc:
+    issuer: ""
+    clientId: ""
+    scopes:
+      - profile
+      - email
+    existingSecret: ""
+    clientSecretKey: client-secret
+    cookieSecretKey: cookie-secret
+    authorizationRule: ""
+  runtime:
+    existingSecret: ""
+  audit:
+    capturePayloads: null
+  subscriptionPassthrough:
+    providers:
+      claude:
+        enabled: false
+        accessKeys: []
+        rateLimit:
+          enabled: true
+          requestsPerInterval: 300
+          interval: 1h
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  topologySpreadConstraints: []
 
-podSecurityContext:
-  runAsNonRoot: true
-  seccompProfile:
-    type: RuntimeDefault
+ui:
+  replicaCount: 2
+  image:
+    repository: ghcr.io/demirtechcom/infegate/ui
+    tag: "1.0.0"
+    digest: ""
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  topologySpreadConstraints: []
 
-securityContext:
-  allowPrivilegeEscalation: false
-  capabilities:
-    drop:
-      - ALL
-  readOnlyRootFilesystem: true
-
-service:
-  type: ClusterIP
-  port: 80
-
-readinessProbe:
-  initialDelaySeconds: 1
-  periodSeconds: 5
-  timeoutSeconds: 2
-  failureThreshold: 6
-
-livenessProbe:
-  initialDelaySeconds: 10
-  periodSeconds: 10
-  timeoutSeconds: 2
-  failureThreshold: 3
-
-resources: {}
-
-revisionHistoryLimit: 10
-priorityClassName: ""
-nodeSelector: {}
-tolerations: []
-affinity: {}
-topologySpreadConstraints: []
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  tls:
+    existingSecret: ""

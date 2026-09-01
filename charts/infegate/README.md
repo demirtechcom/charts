@@ -1,116 +1,146 @@
 # Infegate
 
-This chart installs the standalone Infegate web interface as a Deployment,
-ClusterIP Service, and optional ServiceAccount. It does not install or modify
-agentgateway, an Ingress controller, certificates, or application API routes.
+This chart installs Infegate as one product with two independent workloads:
+`infegate-api` runs the pinned agentgateway runtime and `infegate-ui` serves the
+branded static interface. Both use an external PostgreSQL database. The chart
+does not install PostgreSQL, CloudNativePG, an OIDC provider, certificates, or
+an Ingress controller.
 
 ## Install
 
-Install version `0.1.0` from the DemirTech OCI registry:
+Infegate 1.0.0 supports clean installations only. Prepare three distinct
+Secrets for the database URL, OIDC credentials, and runtime provider
+credentials, then install with explicit audit retention behavior:
+
+```yaml
+publicUrl: https://ai.customer.example
+
+api:
+  database:
+    existingSecret: infegate-db-app
+  oidc:
+    issuer: https://id.customer.example/realms/infegate
+    clientId: infegate
+    existingSecret: infegate-oidc
+    authorizationRule: 'jwt.email.endsWith("@customer.example")'
+  runtime:
+    existingSecret: infegate-runtime
+  audit:
+    capturePayloads: false
+
+ingress:
+  enabled: true
+  className: nginx
+  tls:
+    existingSecret: infegate-tls
+```
 
 ```sh
 helm install infegate oci://ghcr.io/demirtechcom/charts/infegate \
-  --version 0.1.0 \
-  --namespace infegate \
-  --create-namespace
+  --version 1.0.0 --namespace infegate --create-namespace -f values.yaml
 ```
 
-The default release runs two replicas and exposes them through the `infegate`
-Service on port 80. Readiness and liveness probes call `/healthz`. The container
-runs without privilege escalation, with a read-only root filesystem and a
-writable in-memory `/tmp` volume.
+## Native OIDC
+
+The API workload uses agentgateway's native OIDC Authorization Code flow. The
+OIDC Secret must contain `client-secret` and a `cookie-secret` holding 32 random
+bytes encoded as 64 hexadecimal characters. Register
+`https://ai.customer.example/oauth/callback` with the identity provider.
+
+Authentication alone does not grant administration access. Every install must
+provide `api.oidc.authorizationRule`, a fail-closed CEL allow expression. `/ui`,
+`/api`, and `/cel` share the same origin and encrypted session cookie.
+
+## Virtual API keys
+
+The `/v1` API always uses strict Bearer virtual API key authentication. Keys are
+created in the UI and stored in PostgreSQL through hybrid configuration storage.
+Use key metadata such as `name`, `owner`, and `team` to attribute audit and cost
+records. API OAuth and JWT authentication are not enabled in 1.0.0.
+
+## Claude Code
+
+The default Claude Code integration uses a configured Anthropic provider and an
+Infegate virtual key. The real provider credential remains in the runtime
+Secret:
+
+```sh
+export ANTHROPIC_BASE_URL=https://ai.customer.example
+export ANTHROPIC_AUTH_TOKEN=<infegate-virtual-key>
+claude
+```
+
+## Subscription passthrough
+
+The optional Claude subscription route is fixed to
+`/subscriptions/claude/*` and `api.anthropic.com`. It cannot be pointed at an
+arbitrary host. The user's subscription credential remains in `Authorization`;
+Infegate authentication uses `x-infegate-key` and removes that header before
+forwarding.
+
+Store only `sha256:<hex>` hashes in the runtime Secret and reference their
+environment variable names:
+
+```yaml
+api:
+  subscriptionPassthrough:
+    providers:
+      claude:
+        enabled: true
+        accessKeys:
+          - keyHashEnvVar: CLAUDE_TEAM_A_KEY_HASH
+            metadata:
+              name: team-a
+              owner: platform-team
+```
+
+When Claude passthrough is disabled, port 3001 and its Ingress route are not
+rendered. Claude is the only supported subscription provider in 1.0.0.
+
+## PostgreSQL
+
+PostgreSQL is mandatory and is not bundled. CloudNativePG is recommended; its
+`[cluster]-app` Secret already provides the default `uri` key expected by the
+chart. The database URL is injected as `INFEGATE_DATABASE_URL` and the ConfigMap
+contains only `$INFEGATE_DATABASE_URL`, so `/api/config` cannot expose the
+credential. Both API replicas share hybrid configuration, logs, costs, and
+virtual keys through this database.
+
+Set `api.audit.capturePayloads: false` to retain metadata, usage, timing, and
+cost without prompts or completions. Set it to `true` only when full content
+retention is approved.
 
 ## Image digest pinning
 
-The default image tag comes from the chart's `appVersion`. Production installs
-should pin the verified multi-platform image by digest:
-
-```yaml
-image:
-  repository: ghcr.io/demirtechcom/infegate
-  digest: sha256:<64-hex-character-digest>
-```
-
-When `image.digest` is set, it takes precedence over `image.tag`. Keep the chart
-version and image digest together in the deployment configuration so upgrades
-and rollbacks are reproducible.
+Source `values.yaml` uses 1.0.0 tags. The published OCI chart is packaged with
+the immutable UI and gateway digests produced by the Infegate release. Private
+or offline installations may override each repository while retaining its
+digest.
 
 ## Ingress routing
 
-Create ingress routes outside this chart. Route `/ui` and `/ui/*` to the
-Infegate Service on port 80. Route `/api`, `/cel`, and any agentgateway endpoints
-to the agentgateway Service. Do not route `/` or other root paths to Infegate,
-because its image intentionally serves only `/ui`, `/ui/*`, and `/healthz`.
+Built-in Ingress is disabled by default. When enabled, its single hostname is
+derived from the required HTTPS `publicUrl` and an existing TLS Secret is
+mandatory.
 
-## Private registries and offline mirrors
+| Path | API service port |
+| --- | ---: |
+| `/v1` | 3000 |
+| `/ui`, `/api`, `/cel`, `/oauth/callback` | 4000 |
+| `/subscriptions/claude` when enabled | 3001 |
 
-For a private GHCR package, create the registry Secret separately and reference
-its existing name. Do not put registry credentials in Helm values:
-
-```yaml
-imagePullSecrets:
-  - name: ghcr-pull
-```
-
-For an offline installation, mirror the immutable image into the local registry
-and override its repository while retaining the digest:
-
-```yaml
-image:
-  repository: registry.internal.example/infegate
-  digest: sha256:<64-hex-character-digest>
-  pullPolicy: IfNotPresent
-```
+The UI Service remains cluster-internal. Root paths are not routed and return
+404.
 
 ## Upgrade
 
-Review the target chart release and image digest, then render and inspect the
-change before upgrading:
-
-```sh
-helm template infegate oci://ghcr.io/demirtechcom/charts/infegate \
-  --version <chart-version> \
-  --set-string image.digest=sha256:<64-hex-character-digest>
-
-helm upgrade infegate oci://ghcr.io/demirtechcom/charts/infegate \
-  --version <chart-version> \
-  --namespace infegate \
-  --set-string image.digest=sha256:<64-hex-character-digest> \
-  --wait
-```
+Version 1.0.0 has no supported upgrade path from the UI-only 0.1.0 chart or an
+independent agentgateway deployment. Install into a clean namespace with a
+clean PostgreSQL database. For later releases, render and inspect the target
+chart and its two digests before upgrading.
 
 ## Rollback
 
-Rollback to the last known chart version and its recorded image digest. Pinning
-both avoids silently selecting a changed tag:
-
-```sh
-helm upgrade infegate oci://ghcr.io/demirtechcom/charts/infegate \
-  --version <previous-chart-version> \
-  --namespace infegate \
-  --set-string image.digest=sha256:<previous-64-hex-character-digest> \
-  --wait
-```
-
-If the previous Helm revision already contains the required immutable digest,
-`helm rollback infegate <revision> --namespace infegate --wait` is equivalent.
-
-## Values
-
-| Value | Default | Purpose |
-| --- | --- | --- |
-| `replicaCount` | `2` | Number of UI replicas |
-| `image.repository` | `ghcr.io/demirtechcom/infegate` | Image repository or mirror |
-| `image.tag` | `""` | Image tag, defaults to `appVersion` |
-| `image.digest` | `""` | Immutable digest that overrides the tag |
-| `image.pullPolicy` | `IfNotPresent` | Kubernetes image pull policy |
-| `imagePullSecrets` | `[]` | Existing registry Secret names |
-| `serviceAccount.create` | `true` | Create a dedicated ServiceAccount |
-| `service.type` | `ClusterIP` | Kubernetes Service type |
-| `service.port` | `80` | Service port targeting container port 8080 |
-| `resources` | `{}` | Container requests and limits |
-| `nodeSelector`, `tolerations`, `affinity` | empty | Pod scheduling controls |
-| `topologySpreadConstraints` | `[]` | Pod topology distribution controls |
-
-See `values.yaml` and `values.schema.json` for all supported values and their
-validation constraints.
+Rollback the chart and both recorded image digests together. Database schema
+compatibility must be checked against the target release before rollback. A
+Helm rollback does not modify PostgreSQL, OIDC, DNS, TLS, or runtime Secrets.

@@ -1,0 +1,114 @@
+{{- include "infegate.validate" . }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "infegate.componentName" (dict "root" . "component" "api") }}
+  labels:
+    {{- include "infegate.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+data:
+  config.yaml: |
+    config:
+      adminAddr: 127.0.0.1:15000
+      readinessAddr: 0.0.0.0:15021
+      database:
+        url: $INFEGATE_DATABASE_URL
+        maxConnections: {{ .Values.api.database.maxConnections }}
+      storage:
+        mode: hybrid
+      standardAttributes:
+        user: 'apiKey.metadata["owner"]'
+        group: 'apiKey.metadata["team"]'
+    frontendPolicies:
+      accessLog:
+        database:
+          llm: {{ ternary "full" "metadata" .Values.api.audit.capturePayloads }}
+    gateways:
+      api:
+        port: 3000
+      management:
+        port: 4000
+        oidc:
+          issuer: {{ .Values.api.oidc.issuer | quote }}
+          clientId: {{ .Values.api.oidc.clientId | quote }}
+          clientSecret: $INFEGATE_OIDC_CLIENT_SECRET
+          redirectURI: {{ printf "%s/oauth/callback" .Values.publicUrl | quote }}
+          scopes:
+            {{- toYaml .Values.api.oidc.scopes | nindent 12 }}
+        authorization:
+          rules:
+            - allow: {{ .Values.api.oidc.authorizationRule | quote }}
+      {{- if .Values.api.subscriptionPassthrough.providers.claude.enabled }}
+      subscriptions:
+        port: 3001
+      {{- end }}
+    llm:
+      gateways: [api]
+      models: []
+      policies:
+        apiKey:
+          keys: []
+          mode: strict
+          location:
+            header:
+              name: authorization
+              prefix: 'Bearer '
+    routes:
+      - name: management-ui
+        gateways: [management]
+        matches:
+          - path:
+              pathPrefix: /ui
+        backends:
+          - host: {{ printf "%s:80" (include "infegate.componentName" (dict "root" . "component" "ui")) }}
+      - name: management-api
+        gateways: [management]
+        matches:
+          - path:
+              pathPrefix: /api
+          - path:
+              pathPrefix: /cel
+          - path:
+              exact: /oauth/callback
+        backends:
+          - internal: forward
+      {{- with .Values.api.subscriptionPassthrough.providers.claude }}
+      {{- if .enabled }}
+      - name: subscription-claude
+        gateways: [subscriptions]
+        matches:
+          - path:
+              pathPrefix: /subscriptions/claude
+        policies:
+          apiKey:
+            mode: strict
+            location:
+              header:
+                name: x-infegate-key
+            keys:
+              {{- range .accessKeys }}
+              - keyHash: {{ printf "$%s" .keyHashEnvVar }}
+                {{- with .metadata }}
+                metadata:
+                  {{- toYaml . | nindent 18 }}
+                {{- end }}
+              {{- end }}
+          requestHeaderModifier:
+            remove: [x-infegate-key]
+          urlRewrite:
+            path:
+              prefix: /
+          {{- if .rateLimit.enabled }}
+          localRateLimit:
+            - maxTokens: {{ .rateLimit.requestsPerInterval }}
+              tokensPerFill: {{ .rateLimit.requestsPerInterval }}
+              fillInterval: {{ .rateLimit.interval }}
+              type: requests
+          {{- end }}
+        backends:
+          - host: api.anthropic.com:443
+            policies:
+              backendTLS:
+                hostname: api.anthropic.com
+      {{- end }}
+      {{- end }}

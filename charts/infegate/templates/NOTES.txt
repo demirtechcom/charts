@@ -1,5 +1,7 @@
-Infegate is available inside the cluster at:
+Infegate {{ .Chart.AppVersion }} is configured for {{ .Values.publicUrl }}.
 
-  http://{{ include "infegate.fullname" . }}.{{ .Release.Namespace }}.svc:{{ .Values.service.port }}/ui/
+LLM API: {{ .Values.publicUrl }}/v1
+Management UI: {{ .Values.publicUrl }}/ui/
 
-Route only /ui and /ui/* to this Service. Route gateway API paths to agentgateway.
+The API, UI, PostgreSQL, OIDC provider, TLS Secret, and runtime provider
+credentials must be operated independently of this chart.

@@ -1,0 +1,13 @@
+publicUrl: https://ai.test.example
+api:
+  database:
+    existingSecret: infegate-db
+  oidc:
+    issuer: https://id.test.example/realms/infegate
+    clientId: infegate
+    existingSecret: infegate-oidc
+    authorizationRule: 'jwt.email.endsWith("@test.example")'
+  runtime:
+    existingSecret: infegate-runtime
+  audit:
+    capturePayloads: false
