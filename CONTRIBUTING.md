@@ -18,5 +18,6 @@
 ## Pull requests
 
 Run `./scripts/check-charts.sh` and `actionlint .github/workflows/*.yaml` before
-opening a pull request. A chart release is a separate tag after its pull request
-is merged.
+opening a pull request. Infegate chart releases are dispatched by the matching
+published Infegate release after its pull request is merged. Do not create a
+chart release tag manually.

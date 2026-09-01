@@ -9,7 +9,7 @@ Each chart lives at `charts/<chart>/` and owns its templates, defaults,
 
 | Chart | Description |
 | --- | --- |
-| [Infegate](charts/infegate/README.md) | Standalone Infegate web interface |
+| [Infegate](charts/infegate/README.md) | Infegate API and standalone management UI |
 
 ## Validation
 
@@ -24,14 +24,15 @@ and kubeconform.
 
 ## OCI releases
 
-Push a tag named `<chart>-v<chart-version>` after the matching chart version is
-merged. The release workflow publishes only that chart to:
+The Infegate GitHub Release workflow dispatches chart publication with the
+verified UI digest, gateway digest, source commit, and source release identity.
+Tag pushes do not publish charts. The idempotent workflow publishes to:
 
 ```text
 oci://ghcr.io/demirtechcom/charts/<chart>
 ```
 
-For example, `infegate-v0.1.0` publishes
-`ghcr.io/demirtechcom/charts/infegate:0.1.0`.
+The source chart keeps image digests empty. Only the temporary packaged copy
+receives release digests, and an existing artifact is never overwritten.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for chart conventions and checks.

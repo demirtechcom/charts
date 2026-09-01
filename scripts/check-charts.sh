@@ -11,8 +11,16 @@ while IFS= read -r chart_file; do
     exit 1
   }
 
-  helm lint --strict "${chart_dir}"
-  helm template "${chart_name}" "${chart_dir}" |
+  values_args=
+  if test -f "${chart_dir}/ci/test-values.yaml"; then
+    values_args="--values ${chart_dir}/ci/test-values.yaml"
+  fi
+
+  # Word splitting is intentional: values_args is either empty or one --values pair.
+  # shellcheck disable=SC2086
+  helm lint --strict ${values_args} "${chart_dir}"
+  # shellcheck disable=SC2086
+  helm template "${chart_name}" "${chart_dir}" ${values_args} |
     docker run --rm -i ghcr.io/yannh/kubeconform:v0.7.0 \
       -strict \
       -summary \

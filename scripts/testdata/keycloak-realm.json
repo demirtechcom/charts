@@ -1,0 +1,22 @@
+{
+  "realm": "infegate",
+  "enabled": true,
+  "clients": [
+    {
+      "clientId": "infegate",
+      "secret": "infegate-secret",
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "redirectUris": ["https://ai.test.example/oauth/callback"]
+    }
+  ],
+  "users": [
+    {
+      "username": "admin@test.example",
+      "email": "admin@test.example",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{"type": "password", "value": "infegate", "temporary": false}]
+    }
+  ]
+}
