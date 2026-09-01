@@ -102,6 +102,13 @@ grep -Fq 'workflow_dispatch:' "${release_workflow}"
 grep -Fq 'ui_digest:' "${release_workflow}"
 grep -Fq 'gateway_digest:' "${release_workflow}"
 grep -Fq 'source_release_id:' "${release_workflow}"
+grep -Fq 'secrets.RELEASE_APP_ID' "${release_workflow}"
+grep -Fq 'secrets.RELEASE_APP_PRIVATE_KEY' "${release_workflow}"
+grep -Fq 'SOURCE_TOKEN: ${{ steps.source-token.outputs.token }}' "${release_workflow}"
+if grep -Fq 'Authorization: Bearer ${GITHUB_TOKEN}' "${release_workflow}"; then
+  echo "Source release verification must not use the repository-scoped GITHUB_TOKEN" >&2
+  exit 1
+fi
 grep -Fq 'helm push' "${release_workflow}"
 grep -Fq 'Refusing to overwrite' "${release_workflow}"
 if grep -Fq 'tags:' "${release_workflow}"; then
