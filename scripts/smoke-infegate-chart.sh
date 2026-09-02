@@ -12,8 +12,9 @@ readonly cluster="infegate-${GITHUB_RUN_ID:-local}-$$"
 readonly namespace="infegate-smoke-${GITHUB_RUN_ID:-local}-$$"
 readonly api_port="$((20000 + $$ % 10000))"
 readonly ui_port="$((30000 + $$ % 10000))"
-ui_repository=ghcr.io/demirtechcom/infegate
-ui_tag=1.4.1-1
+ui_image="${INFEGATE_SMOKE_UI_IMAGE:-infegate-smoke-ui:local}"
+ui_repository="${ui_image%:*}"
+ui_tag="${ui_image##*:}"
 api_forward_pid=
 ui_forward_pid=
 
@@ -26,11 +27,10 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 kind create cluster --name "${cluster}" --wait 120s
-if test -n "${INFEGATE_SMOKE_UI_IMAGE:-}"; then
-  ui_repository="${INFEGATE_SMOKE_UI_IMAGE%:*}"
-  ui_tag="${INFEGATE_SMOKE_UI_IMAGE##*:}"
-  kind load docker-image "${INFEGATE_SMOKE_UI_IMAGE}" --name "${cluster}"
+if test -z "${INFEGATE_SMOKE_UI_IMAGE:-}"; then
+  docker build --tag "${ui_image}" scripts/testdata/ui
 fi
+kind load docker-image "${ui_image}" --name "${cluster}"
 kubectl create namespace "${namespace}"
 kubectl create secret docker-registry infegate-registry --namespace "${namespace}" \
   --docker-server ghcr.io --docker-username "${GHCR_USERNAME}" --docker-password "${GHCR_TOKEN}"

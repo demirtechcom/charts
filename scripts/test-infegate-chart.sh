@@ -101,6 +101,11 @@ readonly release_workflow=.github/workflows/release.yaml
 readonly checkout='actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2'
 grep -Fq "${checkout}" .github/workflows/check.yaml
 grep -Fq "${checkout}" "${release_workflow}"
+grep -Fq 'docker build --tag "${ui_image}" scripts/testdata/ui' scripts/smoke-infegate-chart.sh
+if grep -Fq 'ghcr.io/demirtechcom/infegate:1.4.1-1' scripts/smoke-infegate-chart.sh; then
+  echo "chart smoke tests must not depend on a private legacy Infegate image" >&2
+  exit 1
+fi
 grep -Fq 'workflow_dispatch:' "${release_workflow}"
 grep -Fq 'ui_digest:' "${release_workflow}"
 grep -Fq 'gateway_digest:' "${release_workflow}"
