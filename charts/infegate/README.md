@@ -8,7 +8,7 @@ an Ingress controller.
 
 ## Install
 
-Infegate 1.0.0 supports clean installations only. Prepare three distinct
+Infegate 1.0.1 supports clean installations and upgrades from 1.0.0. Prepare three distinct
 Secrets for the database URL, OIDC credentials, and runtime provider
 credentials, then install with explicit audit retention behavior:
 
@@ -37,7 +37,7 @@ ingress:
 
 ```sh
 helm install infegate oci://ghcr.io/demirtechcom/charts/infegate \
-  --version 1.0.0 --namespace infegate --create-namespace -f values.yaml
+  --version 1.0.1 --namespace infegate --create-namespace -f values.yaml
 ```
 
 ## Native OIDC
@@ -56,7 +56,7 @@ provide `api.oidc.authorizationRule`, a fail-closed CEL allow expression. `/ui`,
 The `/v1` API always uses strict Bearer virtual API key authentication. Keys are
 created in the UI and stored in PostgreSQL through hybrid configuration storage.
 Use key metadata such as `name`, `owner`, and `team` to attribute audit and cost
-records. API OAuth and JWT authentication are not enabled in 1.0.0.
+records. API OAuth and JWT authentication are not enabled in 1.0.x.
 
 ## Claude Code
 
@@ -95,7 +95,7 @@ api:
 ```
 
 When Claude passthrough is disabled, port 3001 and its Ingress route are not
-rendered. Claude is the only supported subscription provider in 1.0.0.
+rendered. Claude is the only supported subscription provider in 1.0.x.
 
 ## PostgreSQL
 
@@ -112,7 +112,7 @@ retention is approved.
 
 ## Image digest pinning
 
-Source `values.yaml` uses 1.0.0 tags. The published OCI chart is packaged with
+Source `values.yaml` uses 1.0.1 tags. The published OCI chart is packaged with
 the immutable UI and gateway digests produced by the Infegate release. Private
 or offline installations may override each repository while retaining its
 digest.
@@ -134,10 +134,10 @@ The UI Service remains cluster-internal. Root paths are not routed and return
 
 ## Upgrade
 
-Version 1.0.0 has no supported upgrade path from the UI-only 0.1.0 chart or an
-independent agentgateway deployment. Install into a clean namespace with a
-clean PostgreSQL database. For later releases, render and inspect the target
-chart and its two digests before upgrading.
+Version 1.0.1 supports upgrades from 1.0.0. There is no supported upgrade path
+from the UI-only 0.1.0 chart or an independent agentgateway deployment. New
+installations require a clean namespace and PostgreSQL database. Render and
+inspect the target chart and its two digests before upgrading.
 
 ## Rollback
 

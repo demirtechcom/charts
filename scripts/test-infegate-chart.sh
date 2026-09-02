@@ -24,8 +24,8 @@ render > "${work_dir}/default.yaml"
 grep -q 'name: infegate-api' "${work_dir}/default.yaml"
 grep -q 'name: infegate-ui' "${work_dir}/default.yaml"
 test "$(grep -c '^  replicas: 2$' "${work_dir}/default.yaml")" -eq 2
-grep -q 'image: "ghcr.io/demirtechcom/infegate/gateway:1.0.0"' "${work_dir}/default.yaml"
-grep -q 'image: "ghcr.io/demirtechcom/infegate/ui:1.0.0"' "${work_dir}/default.yaml"
+grep -q 'image: "ghcr.io/demirtechcom/infegate/gateway:1.0.1"' "${work_dir}/default.yaml"
+grep -q 'image: "ghcr.io/demirtechcom/infegate/ui:1.0.1"' "${work_dir}/default.yaml"
 grep -q 'url: \$INFEGATE_DATABASE_URL' "${work_dir}/default.yaml"
 grep -q 'mode: hybrid' "${work_dir}/default.yaml"
 grep -q 'llm: metadata' "${work_dir}/default.yaml"
@@ -98,6 +98,14 @@ if render --set api.subscriptionPassthrough.providers.openai.enabled=true >/dev/
 fi
 
 readonly release_workflow=.github/workflows/release.yaml
+readonly checkout='actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2'
+grep -Fq "${checkout}" .github/workflows/check.yaml
+grep -Fq "${checkout}" "${release_workflow}"
+grep -Fq 'docker build --tag "${ui_image}" scripts/testdata/ui' scripts/smoke-infegate-chart.sh
+if grep -Fq 'ghcr.io/demirtechcom/infegate:1.4.1-1' scripts/smoke-infegate-chart.sh; then
+  echo "chart smoke tests must not depend on a private legacy Infegate image" >&2
+  exit 1
+fi
 grep -Fq 'workflow_dispatch:' "${release_workflow}"
 grep -Fq 'ui_digest:' "${release_workflow}"
 grep -Fq 'gateway_digest:' "${release_workflow}"
