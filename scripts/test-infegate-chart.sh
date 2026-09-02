@@ -98,6 +98,9 @@ if render --set api.subscriptionPassthrough.providers.openai.enabled=true >/dev/
 fi
 
 readonly release_workflow=.github/workflows/release.yaml
+readonly checkout='actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2'
+grep -Fq "${checkout}" .github/workflows/check.yaml
+grep -Fq "${checkout}" "${release_workflow}"
 grep -Fq 'workflow_dispatch:' "${release_workflow}"
 grep -Fq 'ui_digest:' "${release_workflow}"
 grep -Fq 'gateway_digest:' "${release_workflow}"
