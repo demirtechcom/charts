@@ -47,6 +47,11 @@ app.kubernetes.io/component: {{ .component }}
 {{- $_ = required "api.oidc.authorizationRule is required" .Values.api.oidc.authorizationRule }}
 {{- $_ = required "api.runtime.existingSecret is required" .Values.api.runtime.existingSecret }}
 {{- if eq .Values.api.audit.capturePayloads nil }}{{ fail "api.audit.capturePayloads must be explicitly true or false" }}{{ end }}
+{{- if .Values.api.mcp.enabled }}
+{{- $_ = required "api.mcp.jwksUrl is required when MCP is enabled" .Values.api.mcp.jwksUrl }}
+{{- if not .Values.api.mcp.audiences }}{{ fail "api.mcp.audiences must contain at least one audience when MCP is enabled" }}{{ end }}
+{{- $_ = required "api.mcp.authorizationRule is required when MCP is enabled" .Values.api.mcp.authorizationRule }}
+{{- end }}
 {{- if or (eq .Values.api.database.existingSecret .Values.api.oidc.existingSecret) (eq .Values.api.database.existingSecret .Values.api.runtime.existingSecret) (eq .Values.api.oidc.existingSecret .Values.api.runtime.existingSecret) }}{{ fail "database, OIDC, and runtime Secret names must be distinct" }}{{ end }}
 {{- if .Values.ingress.enabled }}{{ $_ = required "ingress.tls.existingSecret is required when ingress is enabled" .Values.ingress.tls.existingSecret }}{{ end }}
 {{- end }}

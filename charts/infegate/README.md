@@ -8,7 +8,7 @@ an Ingress controller.
 
 ## Install
 
-Infegate 1.0.2 supports clean installations and upgrades from 1.0.0 and 1.0.1. Prepare three distinct
+Infegate 1.0.3 supports clean installations and upgrades from 1.0.0 through 1.0.2. Prepare three distinct
 Secrets for the database URL, OIDC credentials, and runtime provider
 credentials, then install with explicit audit retention behavior:
 
@@ -29,6 +29,10 @@ api:
     capturePayloads: false
   mcp:
     enabled: true
+    jwksUrl: https://id.customer.example/realms/infegate/protocol/openid-connect/certs
+    audiences:
+      - infegate
+    authorizationRule: '"infegate-mcp-users" in jwt.groups'
 
 ingress:
   enabled: true
@@ -39,7 +43,7 @@ ingress:
 
 ```sh
 helm install infegate oci://ghcr.io/demirtechcom/charts/infegate \
-  --version 1.0.2 --namespace infegate --create-namespace -f values.yaml
+  --version 1.0.3 --namespace infegate --create-namespace -f values.yaml
 ```
 
 ## Native OIDC
@@ -117,10 +121,15 @@ retention is approved.
 Set `api.mcp.enabled: true` to enable PostgreSQL-backed MCP configuration in
 hybrid mode. The chart renders an empty target catalog so MCP servers remain
 managed through Infegate instead of an unrestricted raw gateway configuration.
+MCP listens on the dedicated internal port 3002 and is published at `/mcp` when
+Ingress is enabled. Strict MCP authentication verifies Keycloak JWT signatures
+through `api.mcp.jwksUrl`, and `api.mcp.authorizationRule` must explicitly
+authorize each request. `api.mcp.audiences` must match an audience emitted in
+the Keycloak access token.
 
 ## Image digest pinning
 
-Source `values.yaml` uses 1.0.2 tags. The published OCI chart is packaged with
+Source `values.yaml` uses 1.0.3 tags. The published OCI chart is packaged with
 the immutable UI and gateway digests produced by the Infegate release. Private
 or offline installations may override each repository while retaining its
 digest.
@@ -134,6 +143,7 @@ mandatory.
 | Path | API service port |
 | --- | ---: |
 | `/v1` | 3000 |
+| `/mcp` when enabled | 3002 |
 | `/ui`, `/api`, `/cel`, `/oauth/callback` | 4000 |
 | `/subscriptions/claude` when enabled | 3001 |
 
@@ -142,7 +152,7 @@ The UI Service remains cluster-internal. Root paths are not routed and return
 
 ## Upgrade
 
-Version 1.0.2 supports upgrades from 1.0.0 and 1.0.1. There is no supported upgrade path
+Version 1.0.3 supports upgrades from 1.0.0 through 1.0.2. There is no supported upgrade path
 from the UI-only 0.1.0 chart or an independent agentgateway deployment. New
 installations require a clean namespace and PostgreSQL database. Render and
 inspect the target chart and its two digests before upgrading.

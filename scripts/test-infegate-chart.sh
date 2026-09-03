@@ -24,8 +24,8 @@ render > "${work_dir}/default.yaml"
 grep -q 'name: infegate-api' "${work_dir}/default.yaml"
 grep -q 'name: infegate-ui' "${work_dir}/default.yaml"
 test "$(grep -c '^  replicas: 2$' "${work_dir}/default.yaml")" -eq 2
-grep -q 'image: "ghcr.io/demirtechcom/infegate/gateway:1.0.2"' "${work_dir}/default.yaml"
-grep -q 'image: "ghcr.io/demirtechcom/infegate/ui:1.0.2"' "${work_dir}/default.yaml"
+grep -q 'image: "ghcr.io/demirtechcom/infegate/gateway:1.0.3"' "${work_dir}/default.yaml"
+grep -q 'image: "ghcr.io/demirtechcom/infegate/ui:1.0.3"' "${work_dir}/default.yaml"
 grep -q 'url: \$INFEGATE_DATABASE_URL' "${work_dir}/default.yaml"
 grep -q 'mode: hybrid' "${work_dir}/default.yaml"
 grep -q 'llm: metadata' "${work_dir}/default.yaml"
@@ -36,11 +36,32 @@ grep -q 'automountServiceAccountToken: false' "${work_dir}/default.yaml"
 grep -q 'readOnlyRootFilesystem: true' "${work_dir}/default.yaml"
 ! grep -q 'kind: PodDisruptionBudget' "${work_dir}/default.yaml"
 ! grep -q 'containerPort: 3001' "${work_dir}/default.yaml"
+! grep -q 'containerPort: 3002' "${work_dir}/default.yaml"
 ! grep -q '^    mcp:$' "${work_dir}/default.yaml"
 
-render --set api.mcp.enabled=true > "${work_dir}/mcp.yaml"
+render \
+  --set api.mcp.enabled=true \
+  --set-string api.mcp.jwksUrl=https://id.customer.example/realms/infegate/protocol/openid-connect/certs \
+  --set-string api.mcp.audiences[0]=infegate \
+  --set-string 'api.mcp.authorizationRule="infegate-mcp-users" in jwt.groups' \
+  > "${work_dir}/mcp.yaml"
 grep -q '^    mcp:$' "${work_dir}/mcp.yaml"
+grep -q '^      port: 3002$' "${work_dir}/mcp.yaml"
 grep -q '^      targets: \[\]$' "${work_dir}/mcp.yaml"
+grep -q '^          mode: strict$' "${work_dir}/mcp.yaml"
+grep -q '^            - infegate$' "${work_dir}/mcp.yaml"
+grep -q 'issuer: "https://id.customer.example/realms/infegate"' "${work_dir}/mcp.yaml"
+grep -q 'url: "https://id.customer.example/realms/infegate/protocol/openid-connect/certs"' "${work_dir}/mcp.yaml"
+grep -q 'resource: "https://ai.customer.example/mcp"' "${work_dir}/mcp.yaml"
+grep -q '^            - mcp-session-id$' "${work_dir}/mcp.yaml"
+grep -Fq '\"infegate-mcp-users\" in jwt.groups' "${work_dir}/mcp.yaml"
+grep -q 'containerPort: 3002' "${work_dir}/mcp.yaml"
+grep -q 'name: mcp' "${work_dir}/mcp.yaml"
+
+if render --set api.mcp.enabled=true >/dev/null 2>&1; then
+  echo "enabled MCP must require JWT verification and authorization" >&2
+  exit 1
+fi
 
 render --set api.audit.capturePayloads=true > "${work_dir}/payloads.yaml"
 grep -q 'llm: full' "${work_dir}/payloads.yaml"
@@ -65,6 +86,16 @@ grep -q 'host: ai.customer.example' "${work_dir}/ingress.yaml"
 for path in /v1 /ui /api /cel /oauth/callback /subscriptions/claude; do
   grep -q "path: ${path}" "${work_dir}/ingress.yaml"
 done
+
+render --set ingress.enabled=true \
+  --set-string ingress.tls.existingSecret=infegate-tls \
+  --set api.mcp.enabled=true \
+  --set-string api.mcp.jwksUrl=https://id.customer.example/realms/infegate/protocol/openid-connect/certs \
+  --set-string api.mcp.audiences[0]=infegate \
+  --set-string 'api.mcp.authorizationRule="infegate-mcp-users" in jwt.groups' \
+  > "${work_dir}/mcp-ingress.yaml"
+grep -q 'path: /mcp' "${work_dir}/mcp-ingress.yaml"
+grep -A8 'path: /mcp' "${work_dir}/mcp-ingress.yaml" | grep -q 'number: 3002'
 
 readonly digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 render --set-string "api.image.digest=${digest}" --set-string "ui.image.digest=${digest}" \

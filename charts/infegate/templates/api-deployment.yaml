@@ -65,6 +65,10 @@ spec:
             - name: subscriptions
               containerPort: 3001
             {{- end }}
+            {{- if .Values.api.mcp.enabled }}
+            - name: mcp
+              containerPort: 3002
+            {{- end }}
           readinessProbe:
             httpGet:
               path: /healthz/ready
