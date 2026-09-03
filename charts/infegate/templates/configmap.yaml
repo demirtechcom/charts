@@ -55,6 +55,39 @@ data:
               prefix: 'Bearer '
     {{- if .Values.api.mcp.enabled }}
     mcp:
+      port: 3002
+      policies:
+        cors:
+          allowOrigins:
+            - {{ .Values.publicUrl | quote }}
+          allowHeaders:
+            - authorization
+            - mcp-protocol-version
+            - mcp-session-id
+            - content-type
+            - accept
+            - cache-control
+          exposeHeaders:
+            - Mcp-Session-Id
+        mcpAuthentication:
+          mode: strict
+          issuer: {{ .Values.api.oidc.issuer | quote }}
+          audiences:
+            {{- toYaml .Values.api.mcp.audiences | nindent 12 }}
+          jwks:
+            url: {{ .Values.api.mcp.jwksUrl | quote }}
+          provider:
+            keycloak: {}
+          resourceMetadata:
+            resource: {{ printf "%s/mcp" .Values.publicUrl | quote }}
+            scopesSupported:
+              - openid
+              - profile
+            bearerMethodsSupported:
+              - header
+        mcpAuthorization:
+          rules:
+            - {{ .Values.api.mcp.authorizationRule | quote }}
       targets: []
     {{- end }}
     routes:

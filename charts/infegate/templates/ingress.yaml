@@ -46,4 +46,13 @@ spec:
                 port:
                   number: 3001
           {{- end }}
+          {{- if .Values.api.mcp.enabled }}
+          - path: /mcp
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "infegate.componentName" (dict "root" . "component" "api") }}
+                port:
+                  number: 3002
+          {{- end }}
 {{- end }}
