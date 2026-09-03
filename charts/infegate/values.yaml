@@ -12,7 +12,7 @@ api:
   replicaCount: 2
   image:
     repository: ghcr.io/demirtechcom/infegate/gateway
-    tag: "1.0.1"
+    tag: "1.0.2"
     digest: ""
     pullPolicy: IfNotPresent
   database:
@@ -33,6 +33,8 @@ api:
     existingSecret: ""
   audit:
     capturePayloads: null
+  mcp:
+    enabled: false
   subscriptionPassthrough:
     providers:
       claude:
@@ -55,7 +57,7 @@ ui:
   replicaCount: 2
   image:
     repository: ghcr.io/demirtechcom/infegate/ui
-    tag: "1.0.1"
+    tag: "1.0.2"
     digest: ""
     pullPolicy: IfNotPresent
   resources:

@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Infegate 1.0.1 values",
+  "title": "Infegate 1.0.2 values",
   "type": "object",
   "additionalProperties": false,
   "required": ["publicUrl", "api", "ui", "ingress"],
@@ -30,7 +30,7 @@
     "api": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["replicaCount", "image", "database", "oidc", "runtime", "audit", "subscriptionPassthrough", "resources", "nodeSelector", "tolerations", "affinity", "topologySpreadConstraints"],
+      "required": ["replicaCount", "image", "database", "oidc", "runtime", "audit", "mcp", "subscriptionPassthrough", "resources", "nodeSelector", "tolerations", "affinity", "topologySpreadConstraints"],
       "properties": {
         "replicaCount": { "type": "integer", "minimum": 1 },
         "image": { "$ref": "#/definitions/image" },
@@ -69,6 +69,12 @@
           "additionalProperties": false,
           "required": ["capturePayloads"],
           "properties": { "capturePayloads": { "type": ["boolean", "null"] } }
+        },
+        "mcp": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled"],
+          "properties": { "enabled": { "type": "boolean" } }
         },
         "subscriptionPassthrough": {
           "type": "object",
