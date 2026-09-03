@@ -2,8 +2,8 @@ apiVersion: v2
 name: infegate
 description: Infegate auditable AI gateway and management interface
 type: application
-version: 1.0.1
-appVersion: "1.0.1"
+version: 1.0.2
+appVersion: "1.0.2"
 home: https://infegate.com
 sources:
   - https://github.com/demirtechcom/infegate

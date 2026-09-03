@@ -53,6 +53,10 @@ data:
             header:
               name: authorization
               prefix: 'Bearer '
+    {{- if .Values.api.mcp.enabled }}
+    mcp:
+      targets: []
+    {{- end }}
     routes:
       - name: management-ui
         gateways: [management]

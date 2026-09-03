@@ -8,7 +8,7 @@ an Ingress controller.
 
 ## Install
 
-Infegate 1.0.1 supports clean installations and upgrades from 1.0.0. Prepare three distinct
+Infegate 1.0.2 supports clean installations and upgrades from 1.0.0 and 1.0.1. Prepare three distinct
 Secrets for the database URL, OIDC credentials, and runtime provider
 credentials, then install with explicit audit retention behavior:
 
@@ -27,6 +27,8 @@ api:
     existingSecret: infegate-runtime
   audit:
     capturePayloads: false
+  mcp:
+    enabled: true
 
 ingress:
   enabled: true
@@ -37,7 +39,7 @@ ingress:
 
 ```sh
 helm install infegate oci://ghcr.io/demirtechcom/charts/infegate \
-  --version 1.0.1 --namespace infegate --create-namespace -f values.yaml
+  --version 1.0.2 --namespace infegate --create-namespace -f values.yaml
 ```
 
 ## Native OIDC
@@ -110,9 +112,15 @@ Set `api.audit.capturePayloads: false` to retain metadata, usage, timing, and
 cost without prompts or completions. Set it to `true` only when full content
 retention is approved.
 
+## MCP
+
+Set `api.mcp.enabled: true` to enable PostgreSQL-backed MCP configuration in
+hybrid mode. The chart renders an empty target catalog so MCP servers remain
+managed through Infegate instead of an unrestricted raw gateway configuration.
+
 ## Image digest pinning
 
-Source `values.yaml` uses 1.0.1 tags. The published OCI chart is packaged with
+Source `values.yaml` uses 1.0.2 tags. The published OCI chart is packaged with
 the immutable UI and gateway digests produced by the Infegate release. Private
 or offline installations may override each repository while retaining its
 digest.
@@ -134,7 +142,7 @@ The UI Service remains cluster-internal. Root paths are not routed and return
 
 ## Upgrade
 
-Version 1.0.1 supports upgrades from 1.0.0. There is no supported upgrade path
+Version 1.0.2 supports upgrades from 1.0.0 and 1.0.1. There is no supported upgrade path
 from the UI-only 0.1.0 chart or an independent agentgateway deployment. New
 installations require a clean namespace and PostgreSQL database. Render and
 inspect the target chart and its two digests before upgrading.
