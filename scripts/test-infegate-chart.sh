@@ -144,6 +144,10 @@ fi
 
 readonly release_workflow=.github/workflows/release.yaml
 readonly checkout='actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2'
+if grep -Eq 'test "\$\{VERSION\}" = "[0-9]+\.[0-9]+\.[0-9]+"' "${release_workflow}"; then
+  echo "chart release workflow must validate the dispatched version against Chart.yaml, not a hardcoded release" >&2
+  exit 1
+fi
 grep -Fq "${checkout}" .github/workflows/check.yaml
 grep -Fq "${checkout}" "${release_workflow}"
 grep -Fq 'docker build --tag "${ui_image}" scripts/testdata/ui' scripts/smoke-infegate-chart.sh
