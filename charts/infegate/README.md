@@ -8,7 +8,7 @@ an Ingress controller.
 
 ## Install
 
-Infegate 1.0.5 supports clean installations and upgrades from 1.0.0 through 1.0.4. Prepare three distinct
+Infegate 1.0.6 supports clean installations and upgrades from 1.0.0 through 1.0.5. Prepare three distinct
 Secrets for the database URL, OIDC credentials, and runtime provider
 credentials, then install with explicit audit retention behavior:
 
@@ -43,7 +43,7 @@ ingress:
 
 ```sh
 helm install infegate oci://ghcr.io/demirtechcom/charts/infegate \
-  --version 1.0.5 --namespace infegate --create-namespace -f values.yaml
+  --version 1.0.6 --namespace infegate --create-namespace -f values.yaml
 ```
 
 ## Native OIDC
@@ -131,7 +131,7 @@ the Keycloak access token.
 
 ## Image digest pinning
 
-Source `values.yaml` uses 1.0.5 tags. The published OCI chart is packaged with
+Source `values.yaml` uses 1.0.6 tags. The published OCI chart is packaged with
 the immutable UI and gateway digests produced by the Infegate release. Private
 or offline installations may override each repository while retaining its
 digest.
@@ -158,7 +158,7 @@ continues through the OIDC-protected API listener.
 
 ## Upgrade
 
-Version 1.0.5 supports upgrades from 1.0.0 through 1.0.4. There is no supported upgrade path
+Version 1.0.6 supports upgrades from 1.0.0 through 1.0.5. There is no supported upgrade path
 from the UI-only 0.1.0 chart or an independent agentgateway deployment. New
 installations require a clean namespace and PostgreSQL database. Render and
 inspect the target chart and its two digests before upgrading.
