@@ -67,7 +67,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "${VERSION}" = "1.0.3"
           test "$(awk '$1 == "version:" { print $2 }' charts/infegate/Chart.yaml)" = "${VERSION}"
           test "$(awk '$1 == "appVersion:" { gsub(/\"/, "", $2); print $2 }' charts/infegate/Chart.yaml)" = "${VERSION}"
           grep -Eq '^sha256:[a-f0-9]{64}$' <<<"${UI_DIGEST}"
