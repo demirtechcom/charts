@@ -47,6 +47,15 @@ spec:
                   number: 3001
           {{- end }}
           {{- if .Values.api.mcp.enabled }}
+          {{- range list "/.well-known/oauth-protected-resource/mcp" "/.well-known/oauth-authorization-server/mcp" }}
+          - path: {{ . }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "infegate.componentName" (dict "root" $ "component" "api") }}
+                port:
+                  number: 3002
+          {{- end }}
           - path: /mcp
             pathType: Prefix
             backend:
@@ -55,4 +64,11 @@ spec:
                 port:
                   number: 3002
           {{- end }}
+          - path: /
+            pathType: Exact
+            backend:
+              service:
+                name: {{ include "infegate.componentName" (dict "root" . "component" "ui") }}
+                port:
+                  number: 80
 {{- end }}

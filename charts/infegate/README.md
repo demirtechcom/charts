@@ -8,7 +8,7 @@ an Ingress controller.
 
 ## Install
 
-Infegate 1.0.3 supports clean installations and upgrades from 1.0.0 through 1.0.2. Prepare three distinct
+Infegate 1.0.4 supports clean installations and upgrades from 1.0.0 through 1.0.3. Prepare three distinct
 Secrets for the database URL, OIDC credentials, and runtime provider
 credentials, then install with explicit audit retention behavior:
 
@@ -43,7 +43,7 @@ ingress:
 
 ```sh
 helm install infegate oci://ghcr.io/demirtechcom/charts/infegate \
-  --version 1.0.3 --namespace infegate --create-namespace -f values.yaml
+  --version 1.0.4 --namespace infegate --create-namespace -f values.yaml
 ```
 
 ## Native OIDC
@@ -129,7 +129,7 @@ the Keycloak access token.
 
 ## Image digest pinning
 
-Source `values.yaml` uses 1.0.3 tags. The published OCI chart is packaged with
+Source `values.yaml` uses 1.0.4 tags. The published OCI chart is packaged with
 the immutable UI and gateway digests produced by the Infegate release. Private
 or offline installations may override each repository while retaining its
 digest.
@@ -140,19 +140,23 @@ Built-in Ingress is disabled by default. When enabled, its single hostname is
 derived from the required HTTPS `publicUrl` and an existing TLS Secret is
 mandatory.
 
-| Path | API service port |
-| --- | ---: |
-| `/v1` | 3000 |
-| `/mcp` when enabled | 3002 |
-| `/ui`, `/api`, `/cel`, `/oauth/callback` | 4000 |
-| `/subscriptions/claude` when enabled | 3001 |
+| Path | Service | Port |
+| --- | --- | ---: |
+| `/` | UI | 80 |
+| `/v1` | API | 3000 |
+| `/mcp` when enabled | API | 3002 |
+| `/.well-known/oauth-protected-resource/mcp` when MCP is enabled | API | 3002 |
+| `/.well-known/oauth-authorization-server/mcp` when MCP is enabled | API | 3002 |
+| `/ui`, `/api`, `/cel`, `/oauth/callback` | API | 4000 |
+| `/subscriptions/claude` when enabled | API | 3001 |
 
-The UI Service remains cluster-internal. Root paths are not routed and return
-404.
+The exact root path serves the public Infegate landing page. The UI Service
+remains cluster-internal, unknown root paths return 404, and the management UI
+continues through the OIDC-protected API listener.
 
 ## Upgrade
 
-Version 1.0.3 supports upgrades from 1.0.0 through 1.0.2. There is no supported upgrade path
+Version 1.0.4 supports upgrades from 1.0.0 through 1.0.3. There is no supported upgrade path
 from the UI-only 0.1.0 chart or an independent agentgateway deployment. New
 installations require a clean namespace and PostgreSQL database. Render and
 inspect the target chart and its two digests before upgrading.
