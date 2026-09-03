@@ -143,9 +143,15 @@ data:
               type: requests
           {{- end }}
         backends:
-          - host: api.anthropic.com:443
+          - ai:
+              name: claude-subscription
+              provider:
+                anthropic: {}
             policies:
-              backendTLS:
-                hostname: api.anthropic.com
+              ai:
+                routes:
+                  /v1/messages: messages
+                  /v1/messages/count_tokens: anthropicTokenCount
+                  "*": passthrough
       {{- end }}
       {{- end }}

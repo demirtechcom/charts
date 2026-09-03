@@ -82,7 +82,9 @@ The optional Claude subscription route is fixed to
 `/subscriptions/claude/*` and `api.anthropic.com`. It cannot be pointed at an
 arbitrary host. The user's subscription credential remains in `Authorization`;
 Infegate authentication uses `x-infegate-key` and removes that header before
-forwarding.
+forwarding. Subscription requests use the same PostgreSQL audit log and
+management UI as `/v1` requests. `api.audit.capturePayloads: false` stores only
+metadata, usage, timing, and cost; `true` also stores prompts and completions.
 
 Store only `sha256:<hex>` hashes in the runtime Secret and reference their
 environment variable names:

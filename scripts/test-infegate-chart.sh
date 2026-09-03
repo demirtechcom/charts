@@ -68,13 +68,23 @@ grep -q 'llm: full' "${work_dir}/payloads.yaml"
 
 render \
   --set api.subscriptionPassthrough.providers.claude.enabled=true \
+  --set api.audit.capturePayloads=true \
   --set-string api.subscriptionPassthrough.providers.claude.accessKeys[0].keyHashEnvVar=CLAUDE_TEAM_A_KEY_HASH \
   --set-string api.subscriptionPassthrough.providers.claude.accessKeys[0].metadata.name=team-a \
   > "${work_dir}/claude.yaml"
 grep -q 'containerPort: 3001' "${work_dir}/claude.yaml"
+grep -q 'llm: full' "${work_dir}/claude.yaml"
 grep -q 'pathPrefix: /subscriptions/claude' "${work_dir}/claude.yaml"
 grep -q 'prefix: /' "${work_dir}/claude.yaml"
-grep -q 'host: api.anthropic.com:443' "${work_dir}/claude.yaml"
+grep -q '^              name: claude-subscription$' "${work_dir}/claude.yaml"
+grep -q '^                anthropic: {}$' "${work_dir}/claude.yaml"
+grep -q '^            policies:$' "${work_dir}/claude.yaml"
+grep -q '^              ai:$' "${work_dir}/claude.yaml"
+grep -q '^                routes:$' "${work_dir}/claude.yaml"
+grep -q '^                  /v1/messages: messages$' "${work_dir}/claude.yaml"
+grep -q '^                  /v1/messages/count_tokens: anthropicTokenCount$' "${work_dir}/claude.yaml"
+grep -Fq '                  "*": passthrough' "${work_dir}/claude.yaml"
+! grep -q 'host: api.anthropic.com:443' "${work_dir}/claude.yaml"
 grep -q 'name: x-infegate-key' "${work_dir}/claude.yaml"
 grep -q 'keyHash: \$CLAUDE_TEAM_A_KEY_HASH' "${work_dir}/claude.yaml"
 
