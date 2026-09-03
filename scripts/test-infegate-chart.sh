@@ -24,8 +24,8 @@ render > "${work_dir}/default.yaml"
 grep -q 'name: infegate-api' "${work_dir}/default.yaml"
 grep -q 'name: infegate-ui' "${work_dir}/default.yaml"
 test "$(grep -c '^  replicas: 2$' "${work_dir}/default.yaml")" -eq 2
-grep -q 'image: "ghcr.io/demirtechcom/infegate/gateway:1.0.5"' "${work_dir}/default.yaml"
-grep -q 'image: "ghcr.io/demirtechcom/infegate/ui:1.0.5"' "${work_dir}/default.yaml"
+grep -q 'image: "ghcr.io/demirtechcom/infegate/gateway:1.0.6"' "${work_dir}/default.yaml"
+grep -q 'image: "ghcr.io/demirtechcom/infegate/ui:1.0.6"' "${work_dir}/default.yaml"
 grep -q 'url: \$INFEGATE_DATABASE_URL' "${work_dir}/default.yaml"
 grep -q 'mode: hybrid' "${work_dir}/default.yaml"
 grep -q 'llm: metadata' "${work_dir}/default.yaml"
@@ -107,12 +107,13 @@ render --set ingress.enabled=true \
   --set-string 'api.mcp.authorizationRule="infegate-mcp-users" in jwt.groups' \
   > "${work_dir}/mcp-ingress.yaml"
 grep -q 'path: /mcp' "${work_dir}/mcp-ingress.yaml"
+grep -A2 'path: /mcp$' "${work_dir}/mcp-ingress.yaml" | grep -q 'pathType: Prefix'
 grep -A8 'path: /mcp' "${work_dir}/mcp-ingress.yaml" | grep -q 'number: 3002'
 for path in "/.well-known/oauth-protected-resource/mcp" "/.well-known/oauth-authorization-server/mcp"; do
   grep -q "path: ${path}" "${work_dir}/mcp-ingress.yaml"
+  grep -A2 "path: ${path}" "${work_dir}/mcp-ingress.yaml" | grep -q 'pathType: ImplementationSpecific'
   grep -A8 "path: ${path}" "${work_dir}/mcp-ingress.yaml" | grep -q 'number: 3002'
 done
-grep -A2 'path: /.well-known/oauth-authorization-server/mcp' "${work_dir}/mcp-ingress.yaml" | grep -q 'pathType: Prefix'
 grep -A8 'path: /$' "${work_dir}/mcp-ingress.yaml" | grep -q 'number: 80'
 ! grep -q '/.well-known/oauth-' "${work_dir}/ingress.yaml"
 
