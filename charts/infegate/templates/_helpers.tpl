@@ -58,6 +58,7 @@ app.kubernetes.io/component: {{ .component }}
 {{- end }}
 {{- $_ = required "api.runtime.existingSecret is required" .Values.api.runtime.existingSecret }}
 {{- if eq .Values.api.audit.capturePayloads nil }}{{ fail "api.audit.capturePayloads must be explicitly true or false" }}{{ end }}
+{{- if and .Values.api.metrics.enabled (has (int .Values.api.metrics.port) (list 3000 3001 3002 4000 15021)) }}{{ fail "api.metrics.port conflicts with a reserved Infegate listener port" }}{{ end }}
 {{- if .Values.api.mcp.enabled }}
 {{- if eq .Values.api.mcp.authenticationMode "nativeOAuth" }}
 {{- $_ = required "api.oidc.issuer is required when MCP uses native OAuth" .Values.api.oidc.issuer }}

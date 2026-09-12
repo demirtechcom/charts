@@ -117,7 +117,7 @@ render \
   --set gateway.create=false \
   --set-string gateway.parentRef.name=shared-gateway \
   > "${work_dir}/external-jwt.yaml"
-test "$(grep -c 'name: X-Forwarded-Jwt' "${work_dir}/external-jwt.yaml")" -eq 2
+test "$(grep -c 'name: "X-Forwarded-Jwt"' "${work_dir}/external-jwt.yaml")" -eq 2
 test "$(grep -c 'issuer: "https://identity-proxy.customer.example"' "${work_dir}/external-jwt.yaml")" -eq 2
 grep -q '^            - \$INFEGATE_ADMIN_AUDIENCE$' "${work_dir}/external-jwt.yaml"
 grep -q '^            - \$INFEGATE_MCP_AUDIENCE$' "${work_dir}/external-jwt.yaml"
@@ -348,6 +348,10 @@ expect_render_failure "api.audit.retention.metadataDays must be greater than pay
   --set api.audit.retention.enabled=true \
   --set api.audit.retention.payloadDays=30 \
   --set api.audit.retention.metadataDays=30
+for reserved_port in 3000 3001 3002 4000 15021; do
+  expect_render_failure "api.metrics.port conflicts with a reserved Infegate listener port" \
+    --set api.metrics.port="${reserved_port}"
+done
 if render --set api.subscriptionPassthrough.providers.openai.enabled=true >/dev/null 2>&1; then
   echo "unknown passthrough providers must fail schema validation" >&2
   exit 1

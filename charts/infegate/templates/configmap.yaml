@@ -50,7 +50,7 @@ data:
           mode: strict
           location:
             header:
-              name: {{ .Values.api.management.externalJwt.headerName }}
+              name: {{ .Values.api.management.externalJwt.headerName | quote }}
           preserveToken: false
           issuer: {{ .Values.api.management.externalJwt.issuer | quote }}
           audiences:
@@ -103,7 +103,7 @@ data:
           {{- if eq .Values.api.mcp.authenticationMode "externalJwt" }}
           authorizationLocation:
             header:
-              name: {{ .Values.api.mcp.headerName }}
+              name: {{ .Values.api.mcp.headerName | quote }}
           {{- end }}
           issuer: {{ ternary .Values.api.mcp.issuer .Values.api.oidc.issuer (eq .Values.api.mcp.authenticationMode "externalJwt") | quote }}
           audiences:
