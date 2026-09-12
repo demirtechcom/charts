@@ -231,7 +231,7 @@ render \
   > "${work_dir}/managed-gateway.yaml"
 test "$(grep -c '^kind: Gateway$' "${work_dir}/managed-gateway.yaml")" -eq 1
 test "$(grep -c '^kind: HTTPRoute$' "${work_dir}/managed-gateway.yaml")" -eq 1
-grep -q ^  gatewayClassName: "example-gateway"$' "${work_dir}/managed-gateway.yaml"
+grep -q '^  gatewayClassName: "example-gateway"$' "${work_dir}/managed-gateway.yaml"
 grep -q '^      hostname: "ai.customer.example"$' "${work_dir}/managed-gateway.yaml"
 grep -q '^      port: 443$' "${work_dir}/managed-gateway.yaml"
 grep -q '^      protocol: HTTPS$' "${work_dir}/managed-gateway.yaml"
