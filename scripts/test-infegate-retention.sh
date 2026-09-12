@@ -56,7 +56,8 @@ docker run --detach --name "${container}" \
   postgres:18-alpine >/dev/null
 
 attempt=0
-until docker exec "${container}" pg_isready --username postgres --dbname infegate >/dev/null 2>&1; do
+until docker exec "${container}" psql --username postgres --dbname infegate \
+  --tuples-only --command='SELECT 1' >/dev/null 2>&1; do
   attempt=$((attempt + 1))
   if test "${attempt}" -ge 60; then
     docker logs "${container}" >&2
