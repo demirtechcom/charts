@@ -45,17 +45,25 @@ grep -q 'image: "ghcr.io/demirtechcom/infegate/ui:1.0.6"' "${work_dir}/default.y
 grep -q 'url: \$INFEGATE_DATABASE_URL' "${work_dir}/default.yaml"
 grep -q 'mode: hybrid' "${work_dir}/default.yaml"
 grep -q 'llm: metadata' "${work_dir}/default.yaml"
+grep -q 'cf-access-jwt-assertion' "${work_dir}/default.yaml"
 grep -q 'mode: strict' "${work_dir}/default.yaml"
 grep -q 'name: OIDC_COOKIE_SECRET' "${work_dir}/default.yaml"
 test "$(grep -c 'path: /healthz/ready' "${work_dir}/default.yaml")" -eq 2
 grep -q 'automountServiceAccountToken: false' "${work_dir}/default.yaml"
 grep -q 'readOnlyRootFilesystem: true' "${work_dir}/default.yaml"
+grep -q 'statsAddr: "0.0.0.0:15020"' "${work_dir}/default.yaml"
+test "$(grep -c 'name: metrics' "${work_dir}/default.yaml")" -eq 2
+grep -q 'containerPort: 15020' "${work_dir}/default.yaml"
 ! grep -q 'kind: PodDisruptionBudget' "${work_dir}/default.yaml"
 ! grep -q 'containerPort: 3001' "${work_dir}/default.yaml"
 ! grep -q 'containerPort: 3002' "${work_dir}/default.yaml"
 ! grep -q '^    mcp:$' "${work_dir}/default.yaml"
 ! grep -q '^kind: Gateway$' "${work_dir}/default.yaml"
 ! grep -q '^kind: HTTPRoute$' "${work_dir}/default.yaml"
+
+render --set api.metrics.enabled=false > "${work_dir}/metrics-disabled.yaml"
+grep -q 'statsAddr: "off"' "${work_dir}/metrics-disabled.yaml"
+! grep -q 'name: metrics' "${work_dir}/metrics-disabled.yaml"
 
 render \
   --set api.mcp.enabled=true \
@@ -83,6 +91,48 @@ fi
 
 render --set api.audit.capturePayloads=true > "${work_dir}/payloads.yaml"
 grep -q 'llm: full' "${work_dir}/payloads.yaml"
+
+render \
+  --set api.management.authenticationMode=externalJwt \
+  --set-string api.oidc.issuer= \
+  --set-string api.oidc.clientId= \
+  --set-string api.oidc.existingSecret= \
+  --set-string api.oidc.authorizationRule= \
+  --set-string api.management.externalJwt.issuer=https://team.cloudflareaccess.com \
+  --set-string 'api.management.externalJwt.audiences[0]=$INFEGATE_ACCESS_ADMIN_AUDIENCE' \
+  --set-string api.management.externalJwt.jwksUrl=https://team.cloudflareaccess.com/cdn-cgi/access/certs \
+  --set-string 'api.management.externalJwt.authorizationRule=jwt.email != ""' \
+  --set api.mcp.enabled=true \
+  --set api.mcp.authenticationMode=externalJwt \
+  --set-string api.mcp.issuer=https://team.cloudflareaccess.com \
+  --set-string api.mcp.jwksUrl=https://team.cloudflareaccess.com/cdn-cgi/access/certs \
+  --set-string 'api.mcp.audiences[0]=$INFEGATE_ACCESS_MCP_AUDIENCE' \
+  --set-string 'api.mcp.authorizationRule=jwt.email != ""' \
+  --set api.audit.capturePayloads=true \
+  --set api.audit.captureMcpPayloads=true \
+  --set api.audit.retention.enabled=true \
+  --set gateway.enabled=true \
+  --set gateway.create=false \
+  --set-string gateway.parentRef.name=shared-gateway \
+  > "${work_dir}/external-jwt.yaml"
+test "$(grep -c 'name: Cf-Access-Jwt-Assertion' "${work_dir}/external-jwt.yaml")" -eq 2
+test "$(grep -c 'issuer: "https://team.cloudflareaccess.com"' "${work_dir}/external-jwt.yaml")" -eq 2
+grep -q '^            - \$INFEGATE_ACCESS_ADMIN_AUDIENCE$' "${work_dir}/external-jwt.yaml"
+grep -q '^            - \$INFEGATE_ACCESS_MCP_AUDIENCE$' "${work_dir}/external-jwt.yaml"
+grep -q 'url: "https://team.cloudflareaccess.com/cdn-cgi/access/certs"' "${work_dir}/external-jwt.yaml"
+test "$(grep -c 'requiredClaims: \[exp\]' "${work_dir}/external-jwt.yaml")" -eq 2
+grep -q 'mcp.tool.arguments: mcp.tool.arguments' "${work_dir}/external-jwt.yaml"
+grep -q 'mcp.tool.result: mcp.tool.result' "${work_dir}/external-jwt.yaml"
+grep -q 'mcp.tool.error: mcp.tool.error' "${work_dir}/external-jwt.yaml"
+grep -q '^kind: CronJob$' "${work_dir}/external-jwt.yaml"
+grep -q '^kind: HTTPRoute$' "${work_dir}/external-jwt.yaml"
+grep -q "INTERVAL '30 days'" "${work_dir}/external-jwt.yaml"
+grep -q "INTERVAL '365 days'" "${work_dir}/external-jwt.yaml"
+! grep -q '/oauth/callback' "${work_dir}/external-jwt.yaml"
+! grep -q '/.well-known/oauth-' "${work_dir}/external-jwt.yaml"
+! grep -q 'name: INFEGATE_OIDC_CLIENT_SECRET' "${work_dir}/external-jwt.yaml"
+! grep -q 'name: OIDC_COOKIE_SECRET' "${work_dir}/external-jwt.yaml"
+! grep -q 'keycloak: {}' "${work_dir}/external-jwt.yaml"
 
 render \
   --set api.subscriptionPassthrough.providers.claude.enabled=true \
@@ -200,7 +250,7 @@ assert_gateway_route /v1 PathPrefix infegate-api 3000
 assert_gateway_route /ui PathPrefix infegate-api 4000
 assert_gateway_route /api PathPrefix infegate-api 4000
 assert_gateway_route /cel PathPrefix infegate-api 4000
-assert_gateway_route /oauth/callback PathPrefix infegate-api 4000
+assert_gateway_route /oauth/callback Exact infegate-api 4000
 assert_gateway_route /subscriptions/claude PathPrefix infegate-api 3001
 assert_gateway_route /.well-known/oauth-protected-resource/mcp Exact infegate-api 3002
 assert_gateway_route /.well-known/oauth-authorization-server/mcp Exact infegate-api 3002
@@ -284,6 +334,18 @@ expect_render_failure "publicUrl hostname must be a valid Gateway API hostname" 
 expect_render_failure "gateway.parentRef.name is required when using an existing Gateway" \
   --set gateway.enabled=true \
   --set gateway.create=false
+expect_render_failure "api.management.externalJwt.issuer is required when management uses external JWT" \
+  --set api.management.authenticationMode=externalJwt
+expect_render_failure "api.mcp.issuer is required when MCP uses external JWT" \
+  --set api.mcp.enabled=true \
+  --set api.mcp.authenticationMode=externalJwt \
+  --set-string api.mcp.jwksUrl=https://team.cloudflareaccess.com/cdn-cgi/access/certs \
+  --set-string api.mcp.audiences[0]=infegate \
+  --set-string api.mcp.authorizationRule=true
+expect_render_failure "api.audit.retention.metadataDays must be greater than payloadDays" \
+  --set api.audit.retention.enabled=true \
+  --set api.audit.retention.payloadDays=30 \
+  --set api.audit.retention.metadataDays=30
 if render --set api.subscriptionPassthrough.providers.openai.enabled=true >/dev/null 2>&1; then
   echo "unknown passthrough providers must fail schema validation" >&2
   exit 1
@@ -291,7 +353,7 @@ fi
 
 readonly release_workflow=.github/workflows/release.yaml
 readonly checkout='actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2'
-grep -q '^version: 1.1.0$' "${chart}/Chart.yaml"
+grep -q '^version: 1.2.0$' "${chart}/Chart.yaml"
 grep -q '^appVersion: "1.0.6"$' "${chart}/Chart.yaml"
 if grep -Eq 'test "\$\{VERSION\}" = "[0-9]+\.[0-9]+\.[0-9]+"' "${release_workflow}"; then
   echo "chart release workflow must validate the dispatched version against Chart.yaml, not a hardcoded release" >&2

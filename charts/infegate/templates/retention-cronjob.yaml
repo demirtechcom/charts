@@ -1,0 +1,62 @@
+{{- if .Values.api.audit.retention.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "infegate.componentName" (dict "root" . "component" "retention") }}
+  labels:
+    {{- include "infegate.labels" . | nindent 4 }}
+    app.kubernetes.io/component: retention
+spec:
+  schedule: {{ .Values.api.audit.retention.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            {{- include "infegate.selectorLabels" (dict "root" . "component" "retention") | nindent 12 }}
+        spec:
+          automountServiceAccountToken: false
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: {{ .Values.api.audit.retention.securityContext.runAsUser }}
+            runAsGroup: {{ .Values.api.audit.retention.securityContext.runAsGroup }}
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: retention
+              image: {{ include "infegate.image" (dict "image" .Values.api.audit.retention.image) | quote }}
+              imagePullPolicy: {{ .Values.api.audit.retention.image.pullPolicy }}
+              command: [/bin/sh, -ec]
+              args:
+                - exec psql --file=/etc/infegate/retention.sql
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: [ALL]
+                readOnlyRootFilesystem: true
+              env:
+                - name: PGDATABASE
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.api.database.existingSecret }}
+                      key: {{ .Values.api.database.key }}
+              resources:
+                {{- toYaml .Values.api.audit.retention.resources | nindent 16 }}
+              volumeMounts:
+                - name: retention-sql
+                  mountPath: /etc/infegate
+                  readOnly: true
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: retention-sql
+              configMap:
+                name: {{ include "infegate.componentName" (dict "root" . "component" "retention") }}
+            - name: tmp
+              emptyDir: {}
+{{- end }}

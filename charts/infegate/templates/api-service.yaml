@@ -19,6 +19,11 @@ spec:
     - name: readiness
       port: 15021
       targetPort: readiness
+    {{- if .Values.api.metrics.enabled }}
+    - name: metrics
+      port: {{ .Values.api.metrics.port }}
+      targetPort: metrics
+    {{- end }}
     {{- if .Values.api.subscriptionPassthrough.providers.claude.enabled }}
     - name: subscriptions
       port: 3001

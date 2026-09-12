@@ -44,6 +44,7 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.api.database.existingSecret }}
                   key: {{ .Values.api.database.key }}
+            {{- if eq .Values.api.management.authenticationMode "oidc" }}
             - name: INFEGATE_OIDC_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
@@ -54,6 +55,7 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.api.oidc.existingSecret }}
                   key: {{ .Values.api.oidc.cookieSecretKey }}
+            {{- end }}
           ports:
             - name: llm
               containerPort: 3000
@@ -61,6 +63,10 @@ spec:
               containerPort: 4000
             - name: readiness
               containerPort: 15021
+            {{- if .Values.api.metrics.enabled }}
+            - name: metrics
+              containerPort: {{ .Values.api.metrics.port }}
+            {{- end }}
             {{- if .Values.api.subscriptionPassthrough.providers.claude.enabled }}
             - name: subscriptions
               containerPort: 3001

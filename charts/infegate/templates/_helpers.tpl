@@ -44,18 +44,39 @@ app.kubernetes.io/component: {{ .component }}
 {{- $publicUrlHost := get $publicUrlParts "host" }}
 {{- $publicUrlHostname := get $publicUrlParts "hostname" }}
 {{- $_ := required "api.database.existingSecret is required" .Values.api.database.existingSecret }}
+{{- if eq .Values.api.management.authenticationMode "oidc" }}
 {{- $_ = required "api.oidc.issuer is required" .Values.api.oidc.issuer }}
 {{- $_ = required "api.oidc.clientId is required" .Values.api.oidc.clientId }}
 {{- $_ = required "api.oidc.existingSecret is required" .Values.api.oidc.existingSecret }}
 {{- $_ = required "api.oidc.authorizationRule is required" .Values.api.oidc.authorizationRule }}
+{{- else if eq .Values.api.management.authenticationMode "externalJwt" }}
+{{- $_ = required "api.management.externalJwt.issuer is required when management uses external JWT" .Values.api.management.externalJwt.issuer }}
+{{- if not .Values.api.management.externalJwt.audiences }}{{ fail "api.management.externalJwt.audiences must contain at least one audience when management uses external JWT" }}{{ end }}
+{{- $_ = required "api.management.externalJwt.jwksUrl is required when management uses external JWT" .Values.api.management.externalJwt.jwksUrl }}
+{{- $_ = required "api.management.externalJwt.headerName is required when management uses external JWT" .Values.api.management.externalJwt.headerName }}
+{{- $_ = required "api.management.externalJwt.authorizationRule is required when management uses external JWT" .Values.api.management.externalJwt.authorizationRule }}
+{{- end }}
 {{- $_ = required "api.runtime.existingSecret is required" .Values.api.runtime.existingSecret }}
 {{- if eq .Values.api.audit.capturePayloads nil }}{{ fail "api.audit.capturePayloads must be explicitly true or false" }}{{ end }}
 {{- if .Values.api.mcp.enabled }}
+{{- if eq .Values.api.mcp.authenticationMode "nativeOAuth" }}
+{{- $_ = required "api.oidc.issuer is required when MCP uses native OAuth" .Values.api.oidc.issuer }}
+{{- else if eq .Values.api.mcp.authenticationMode "externalJwt" }}
+{{- $_ = required "api.mcp.issuer is required when MCP uses external JWT" .Values.api.mcp.issuer }}
+{{- $_ = required "api.mcp.headerName is required when MCP uses external JWT" .Values.api.mcp.headerName }}
+{{- end }}
 {{- $_ = required "api.mcp.jwksUrl is required when MCP is enabled" .Values.api.mcp.jwksUrl }}
 {{- if not .Values.api.mcp.audiences }}{{ fail "api.mcp.audiences must contain at least one audience when MCP is enabled" }}{{ end }}
 {{- $_ = required "api.mcp.authorizationRule is required when MCP is enabled" .Values.api.mcp.authorizationRule }}
 {{- end }}
+{{- if .Values.api.audit.retention.enabled }}
+{{- if le (int .Values.api.audit.retention.payloadDays) 0 }}{{ fail "api.audit.retention.payloadDays must be greater than zero" }}{{ end }}
+{{- if le (int .Values.api.audit.retention.metadataDays) (int .Values.api.audit.retention.payloadDays) }}{{ fail "api.audit.retention.metadataDays must be greater than payloadDays" }}{{ end }}
+{{- end }}
+{{- if eq .Values.api.management.authenticationMode "oidc" }}
 {{- if or (eq .Values.api.database.existingSecret .Values.api.oidc.existingSecret) (eq .Values.api.database.existingSecret .Values.api.runtime.existingSecret) (eq .Values.api.oidc.existingSecret .Values.api.runtime.existingSecret) }}{{ fail "database, OIDC, and runtime Secret names must be distinct" }}{{ end }}
+{{- else if eq .Values.api.database.existingSecret .Values.api.runtime.existingSecret }}{{ fail "database and runtime Secret names must be distinct" }}
+{{- end }}
 {{- if and .Values.ingress.enabled .Values.gateway.enabled }}{{ fail "ingress.enabled and gateway.enabled cannot both be true" }}{{ end }}
 {{- if .Values.ingress.enabled }}{{ $_ = required "ingress.tls.existingSecret is required when ingress is enabled" .Values.ingress.tls.existingSecret }}{{ end }}
 {{- if .Values.gateway.enabled }}

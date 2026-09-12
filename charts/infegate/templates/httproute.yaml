@@ -25,15 +25,20 @@ spec:
     - {{ include "infegate.host" . | quote }}
   rules:
     {{- include "infegate.httpRouteRule" (dict "root" . "path" "/v1" "type" "PathPrefix" "component" "api" "port" 3000) | nindent 4 }}
-    {{- range list "/ui" "/api" "/cel" "/oauth/callback" }}
+    {{- range list "/ui" "/api" "/cel" }}
     {{- include "infegate.httpRouteRule" (dict "root" $ "path" . "type" "PathPrefix" "component" "api" "port" 4000) | nindent 4 }}
+    {{- end }}
+    {{- if eq .Values.api.management.authenticationMode "oidc" }}
+    {{- include "infegate.httpRouteRule" (dict "root" . "path" "/oauth/callback" "type" "Exact" "component" "api" "port" 4000) | nindent 4 }}
     {{- end }}
     {{- if .Values.api.subscriptionPassthrough.providers.claude.enabled }}
     {{- include "infegate.httpRouteRule" (dict "root" . "path" "/subscriptions/claude" "type" "PathPrefix" "component" "api" "port" 3001) | nindent 4 }}
     {{- end }}
     {{- if .Values.api.mcp.enabled }}
+    {{- if eq .Values.api.mcp.authenticationMode "nativeOAuth" }}
     {{- range list "/.well-known/oauth-protected-resource/mcp" "/.well-known/oauth-authorization-server/mcp" }}
     {{- include "infegate.httpRouteRule" (dict "root" $ "path" . "type" "Exact" "component" "api" "port" 3002) | nindent 4 }}
+    {{- end }}
     {{- end }}
     {{- include "infegate.httpRouteRule" (dict "root" . "path" "/mcp" "type" "PathPrefix" "component" "api" "port" 3002) | nindent 4 }}
     {{- end }}
