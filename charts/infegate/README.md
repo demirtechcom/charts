@@ -142,6 +142,12 @@ contains only `$INFEGATE_DATABASE_URL`, so `/api/config` cannot expose the
 credential. Both API replicas share hybrid configuration, logs, costs, and
 virtual keys through this database.
 
+Size PostgreSQL for the API connection ceiling before raising autoscaling
+limits. The upper bound is `api.autoscaling.maxReplicas` multiplied by
+`api.database.maxConnections`, which is 150 connections with chart defaults.
+Reserve additional capacity for operators, migrations, retention, and other
+database clients.
+
 Set `api.audit.capturePayloads: false` to retain metadata, usage, timing, and
 cost without prompts or completions. Set it to `true` only when full content
 retention is approved.
@@ -225,6 +231,12 @@ defaults include memory and ephemeral-storage limits; CPU limits are omitted to
 avoid throttling latency-sensitive requests. The chart supports Kubernetes
 1.30 and newer.
 
+Each probe has a `type` discriminator: `httpGet`, `tcpSocket`, `exec`, or
+`grpc`. The chart renders only the selected handler, so changing a probe type
+does not combine the new handler with defaults left behind by Helm value
+merging. Deployment strategy behaves the same way: setting `strategy.type` to
+`Recreate` omits the default `rollingUpdate` block.
+
 ## Image digest pinning
 
 Source `values.yaml` uses 1.0.6 tags. The published OCI chart is packaged with
@@ -293,7 +305,15 @@ for the resources and listener model used by the chart.
 ## Upgrade
 
 Chart 2.0.0 removes `api.replicaCount` and `ui.replicaCount`. Remove those keys
-from existing values and configure each workload under `autoscaling`. Native
+from existing values and configure each workload under `autoscaling`. Rename
+`api.audit.retention.securityContext` to `podSecurityContext` and move
+container-only settings such as `allowPrivilegeEscalation`, capabilities, and
+`readOnlyRootFilesystem` to `containerSecurityContext`.
+
+During an upgrade from 1.x, Helm removes the old Deployment replica field before
+the new HPA reconciles its minimum. This can briefly reduce a workload to one
+replica. Perform the upgrade during a controlled window and verify both HPAs
+have reached `minReplicas` before ending the window. Native
 OIDC remains the default, so no authentication migration is required. New
 installations require a clean namespace and PostgreSQL database. Render and
 inspect the target chart and its two image digests before upgrading.

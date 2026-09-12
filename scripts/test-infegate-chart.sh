@@ -67,6 +67,7 @@ test "$(grep -c '^      maxSurge: 1$' "${work_dir}/default.yaml")" -eq 2
 test "$(grep -c '^      topologySpreadConstraints:$' "${work_dir}/default.yaml")" -eq 2
 test "$(grep -c '^          topologyKey: topology.kubernetes.io/zone$' "${work_dir}/default.yaml")" -eq 2
 test "$(grep -c '^          topologyKey: kubernetes.io/hostname$' "${work_dir}/default.yaml")" -eq 2
+test "$(grep -c '^          whenUnsatisfiable: ScheduleAnyway$' "${work_dir}/default.yaml")" -eq 4
 grep -q '^        checksum/config: "[a-f0-9]\{64\}"$' "${work_dir}/default.yaml"
 grep -q '^              ephemeral-storage: 256Mi$' "${work_dir}/default.yaml"
 grep -q '^              ephemeral-storage: 64Mi$' "${work_dir}/default.yaml"
@@ -91,6 +92,20 @@ render \
   > "${work_dir}/ha-disabled.yaml"
 ! grep -q '^kind: PodDisruptionBudget$' "${work_dir}/ha-disabled.yaml"
 ! grep -q '^      topologySpreadConstraints:$' "${work_dir}/ha-disabled.yaml"
+
+render --show-only templates/api-deployment.yaml \
+  --set api.strategy.type=Recreate \
+  > "${work_dir}/recreate.yaml"
+grep -q '^    type: "Recreate"$' "${work_dir}/recreate.yaml"
+! grep -q 'rollingUpdate:' "${work_dir}/recreate.yaml"
+
+render --show-only templates/api-deployment.yaml \
+  --set api.livenessProbe.type=httpGet \
+  --set-string api.livenessProbe.httpGet.path=/healthz/live \
+  --set-string api.livenessProbe.httpGet.port=readiness \
+  > "${work_dir}/http-liveness.yaml"
+grep -q '^              path: /healthz/live$' "${work_dir}/http-liveness.yaml"
+test "$(grep -c '^            tcpSocket:$' "${work_dir}/http-liveness.yaml")" -eq 1
 
 render \
   --set api.autoscaling.targetMemoryUtilizationPercentage=80 \

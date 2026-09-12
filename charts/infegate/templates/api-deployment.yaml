@@ -7,7 +7,11 @@ metadata:
     app.kubernetes.io/component: api
 spec:
   strategy:
-    {{- toYaml .Values.api.strategy | nindent 4 }}
+    type: {{ .Values.api.strategy.type | quote }}
+    {{- if eq .Values.api.strategy.type "RollingUpdate" }}
+    rollingUpdate:
+      {{- toYaml .Values.api.strategy.rollingUpdate | nindent 6 }}
+    {{- end }}
   selector:
     matchLabels:
       {{- include "infegate.selectorLabels" (dict "root" . "component" "api") | nindent 6 }}
@@ -75,11 +79,11 @@ spec:
               containerPort: 3002
             {{- end }}
           startupProbe:
-            {{- toYaml .Values.api.startupProbe | nindent 12 }}
+            {{- include "infegate.probe" .Values.api.startupProbe | nindent 12 }}
           readinessProbe:
-            {{- toYaml .Values.api.readinessProbe | nindent 12 }}
+            {{- include "infegate.probe" .Values.api.readinessProbe | nindent 12 }}
           livenessProbe:
-            {{- toYaml .Values.api.livenessProbe | nindent 12 }}
+            {{- include "infegate.probe" .Values.api.livenessProbe | nindent 12 }}
           resources:
             {{- toYaml .Values.api.resources | nindent 12 }}
           volumeMounts:
@@ -117,7 +121,7 @@ spec:
               {{- include "infegate.selectorLabels" (dict "root" . "component" "api") | nindent 14 }}
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
-          whenUnsatisfiable: DoNotSchedule
+          whenUnsatisfiable: ScheduleAnyway
           labelSelector:
             matchLabels:
               {{- include "infegate.selectorLabels" (dict "root" . "component" "api") | nindent 14 }}

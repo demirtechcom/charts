@@ -42,16 +42,19 @@ api:
       maxSurge: 1
   terminationGracePeriodSeconds: 60
   startupProbe:
+    type: tcpSocket
     tcpSocket:
       port: readiness
     periodSeconds: 2
     failureThreshold: 30
   readinessProbe:
+    type: httpGet
     httpGet:
       path: /healthz/ready
       port: readiness
     periodSeconds: 5
   livenessProbe:
+    type: tcpSocket
     tcpSocket:
       port: readiness
     periodSeconds: 10
@@ -202,17 +205,20 @@ ui:
       maxSurge: 1
   terminationGracePeriodSeconds: 60
   startupProbe:
+    type: httpGet
     httpGet:
       path: /healthz
       port: http
     periodSeconds: 2
     failureThreshold: 30
   readinessProbe:
+    type: httpGet
     httpGet:
       path: /healthz
       port: http
     periodSeconds: 5
   livenessProbe:
+    type: httpGet
     httpGet:
       path: /healthz
       port: http

@@ -113,3 +113,18 @@ app.kubernetes.io/component: {{ .component | quote }}
       port: {{ .port }}
       weight: 1
 {{- end }}
+
+{{/* Render exactly one probe handler so Helm map merging cannot combine handlers. */}}
+{{- define "infegate.probe" -}}
+{{- $type := required "probe.type is required" .type -}}
+{{- if not (has $type (list "httpGet" "tcpSocket" "exec" "grpc")) -}}
+{{- fail (printf "unsupported probe.type %q" $type) -}}
+{{- end -}}
+{{- $handler := index . $type -}}
+{{- if not $handler -}}
+{{- fail (printf "probe.%s configuration is required when probe.type is %s" $type $type) -}}
+{{- end -}}
+{{ $type }}:
+{{ toYaml $handler | indent 2 }}
+{{ omit . "type" "httpGet" "tcpSocket" "exec" "grpc" | toYaml }}
+{{- end }}
