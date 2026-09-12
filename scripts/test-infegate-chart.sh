@@ -37,8 +37,8 @@ expect_render_failure() {
 }
 
 render > "${work_dir}/default.yaml"
-grep -q 'name: infegate-api' "${work_dir}/default.yaml"
-grep -q 'name: infegate-ui' "${work_dir}/default.yaml"
+grep -q 'name: "infegate-api"' "${work_dir}/default.yaml"
+grep -q 'name: "infegate-ui"' "${work_dir}/default.yaml"
 ! grep -q '^  replicas:' "${work_dir}/default.yaml"
 test "$(grep -c '^kind: HorizontalPodAutoscaler$' "${work_dir}/default.yaml")" -eq 2
 test "$(grep -c '^  minReplicas: 3$' "${work_dir}/default.yaml")" -eq 2
@@ -210,7 +210,7 @@ grep -q '^                  /v1/messages/count_tokens: anthropicTokenCount$' "${
 grep -Fq '                  "*": passthrough' "${work_dir}/claude.yaml"
 ! grep -q 'host: api.anthropic.com:443' "${work_dir}/claude.yaml"
 grep -q 'name: x-infegate-key' "${work_dir}/claude.yaml"
-grep -q 'keyHash: \$CLAUDE_TEAM_A_KEY_HASH' "${work_dir}/claude.yaml"
+grep -q 'keyHash: "\$CLAUDE_TEAM_A_KEY_HASH"' "${work_dir}/claude.yaml"
 
 render --set ingress.enabled=true \
   --set-string ingress.tls.existingSecret=infegate-tls \
@@ -218,10 +218,10 @@ render --set ingress.enabled=true \
   > "${work_dir}/ingress.yaml"
 grep -q 'host: "ai.customer.example"' "${work_dir}/ingress.yaml"
 for path in /v1 /ui /api /cel /oauth/callback /subscriptions/claude; do
-  grep -q "path: ${path}" "${work_dir}/ingress.yaml"
+  grep -q "path: \"${path}\"" "${work_dir}/ingress.yaml"
 done
-grep -A8 'path: /$' "${work_dir}/ingress.yaml" | grep -q 'number: 80'
-grep -A2 'path: /$' "${work_dir}/ingress.yaml" | grep -q 'pathType: Exact'
+grep -A8 'path: "/"$' "${work_dir}/ingress.yaml" | grep -q 'number: 80'
+grep -A2 'path: "/"$' "${work_dir}/ingress.yaml" | grep -q 'pathType: Exact'
 
 render \
   --set gateway.enabled=true \
@@ -231,16 +231,16 @@ render \
   > "${work_dir}/managed-gateway.yaml"
 test "$(grep -c '^kind: Gateway$' "${work_dir}/managed-gateway.yaml")" -eq 1
 test "$(grep -c '^kind: HTTPRoute$' "${work_dir}/managed-gateway.yaml")" -eq 1
-grep -q '^  gatewayClassName: example-gateway$' "${work_dir}/managed-gateway.yaml"
+grep -q ^  gatewayClassName: "example-gateway"$' "${work_dir}/managed-gateway.yaml"
 grep -q '^      hostname: "ai.customer.example"$' "${work_dir}/managed-gateway.yaml"
 grep -q '^      port: 443$' "${work_dir}/managed-gateway.yaml"
 grep -q '^      protocol: HTTPS$' "${work_dir}/managed-gateway.yaml"
-grep -q '^[[:space:]]*name: infegate-tls$' "${work_dir}/managed-gateway.yaml"
+grep -q '^[[:space:]]*name: "infegate-tls"$' "${work_dir}/managed-gateway.yaml"
 grep -q '^    owner: platform$' "${work_dir}/managed-gateway.yaml"
 grep -A5 '^  parentRefs:$' "${work_dir}/managed-gateway.yaml" | grep -q '^    - group: gateway.networking.k8s.io$'
 grep -A5 '^  parentRefs:$' "${work_dir}/managed-gateway.yaml" | grep -q '^      kind: Gateway$'
-grep -A5 '^  parentRefs:$' "${work_dir}/managed-gateway.yaml" | grep -q '^      name: infegate$'
-grep -A5 '^  parentRefs:$' "${work_dir}/managed-gateway.yaml" | grep -q '^      sectionName: https$'
+grep -A5 '^  parentRefs:$' "${work_dir}/managed-gateway.yaml" | grep -q '^      name: "infegate"$'
+grep -A5 '^  parentRefs:$' "${work_dir}/managed-gateway.yaml" | grep -q '^      sectionName: "https"$'
 
 render \
   --set gateway.enabled=true \
@@ -251,9 +251,9 @@ render \
   > "${work_dir}/existing-gateway.yaml"
 ! grep -q '^kind: Gateway$' "${work_dir}/existing-gateway.yaml"
 test "$(grep -c '^kind: HTTPRoute$' "${work_dir}/existing-gateway.yaml")" -eq 1
-grep -A6 '^  parentRefs:$' "${work_dir}/existing-gateway.yaml" | grep -q '^      name: shared-gateway$'
-grep -A6 '^  parentRefs:$' "${work_dir}/existing-gateway.yaml" | grep -q '^      namespace: gateway-system$'
-grep -A6 '^  parentRefs:$' "${work_dir}/existing-gateway.yaml" | grep -q '^      sectionName: https$'
+grep -A6 '^  parentRefs:$' "${work_dir}/existing-gateway.yaml" | grep -q '^      name: "shared-gateway"$'
+grep -A6 '^  parentRefs:$' "${work_dir}/existing-gateway.yaml" | grep -q '^      namespace: "gateway-system"$'
+grep -A6 '^  parentRefs:$' "${work_dir}/existing-gateway.yaml" | grep -q '^      sectionName: "https"$'
 
 render \
   --set-string publicUrl=https://ai.customer.example:8443 \
@@ -281,8 +281,8 @@ test "$(grep -c '^kind: HTTPRoute$' "${work_dir}/shared-gateway.yaml")" -eq 1
 grep -q '^    - "ai.customer.example"$' "${work_dir}/shared-gateway.yaml"
 grep -A6 '^  parentRefs:$' "${work_dir}/shared-gateway.yaml" | grep -q '^    - group: gateway.networking.k8s.io$'
 grep -A6 '^  parentRefs:$' "${work_dir}/shared-gateway.yaml" | grep -q '^      kind: Gateway$'
-grep -A6 '^  parentRefs:$' "${work_dir}/shared-gateway.yaml" | grep -q '^      name: shared-gateway$'
-grep -A6 '^  parentRefs:$' "${work_dir}/shared-gateway.yaml" | grep -q '^      namespace: gateway-system$'
+grep -A6 '^  parentRefs:$' "${work_dir}/shared-gateway.yaml" | grep -q '^      name: "shared-gateway"$'
+grep -A6 '^  parentRefs:$' "${work_dir}/shared-gateway.yaml" | grep -q '^      namespace: "gateway-system"$'
 ! grep -q 'sectionName:' "${work_dir}/shared-gateway.yaml"
 
 assert_gateway_route() {
@@ -293,12 +293,12 @@ assert_gateway_route() {
   route_block="${work_dir}/route-block.yaml"
 
   if test "${path}" = /; then
-    grep -B2 -A8 'value: /$' "${work_dir}/shared-gateway.yaml" > "${route_block}"
+    grep -B2 -A8 'value: "/"$' "${work_dir}/shared-gateway.yaml" > "${route_block}"
   else
-    grep -F -B2 -A8 "value: ${path}" "${work_dir}/shared-gateway.yaml" > "${route_block}"
+    grep -F -B2 -A8 "value: \"${path}\"" "${work_dir}/shared-gateway.yaml" > "${route_block}"
   fi
-  grep -q "type: ${path_type}" "${route_block}"
-  grep -q "name: ${service}" "${route_block}"
+  grep -q "type: \"${path_type}\"" "${route_block}"
+  grep -q "name: \"${service}\"" "${route_block}"
   grep -q "port: ${port}" "${route_block}"
 }
 
@@ -323,15 +323,15 @@ render --set ingress.enabled=true \
   --set-string api.mcp.audiences[0]=infegate \
   --set-string 'api.mcp.authorizationRule="infegate-mcp-users" in jwt.groups' \
   > "${work_dir}/mcp-ingress.yaml"
-grep -q 'path: /mcp' "${work_dir}/mcp-ingress.yaml"
-grep -A2 'path: /mcp$' "${work_dir}/mcp-ingress.yaml" | grep -q 'pathType: Prefix'
-grep -A8 'path: /mcp' "${work_dir}/mcp-ingress.yaml" | grep -q 'number: 3002'
+grep -q 'path: "/mcp"' "${work_dir}/mcp-ingress.yaml"
+grep -A2 'path: "/mcp"$' "${work_dir}/mcp-ingress.yaml" | grep -q 'pathType: Prefix'
+grep -A8 'path: "/mcp"' "${work_dir}/mcp-ingress.yaml" | grep -q 'number: 3002'
 for path in "/.well-known/oauth-protected-resource/mcp" "/.well-known/oauth-authorization-server/mcp"; do
-  grep -q "path: ${path}" "${work_dir}/mcp-ingress.yaml"
-  grep -A2 "path: ${path}" "${work_dir}/mcp-ingress.yaml" | grep -q 'pathType: ImplementationSpecific'
-  grep -A8 "path: ${path}" "${work_dir}/mcp-ingress.yaml" | grep -q 'number: 3002'
+  grep -q "path: \"${path}\"" "${work_dir}/mcp-ingress.yaml"
+  grep -A2 "path: \"${path}\"" "${work_dir}/mcp-ingress.yaml" | grep -q 'pathType: ImplementationSpecific'
+  grep -A8 "path: \"${path}\"" "${work_dir}/mcp-ingress.yaml" | grep -q 'number: 3002'
 done
-grep -A8 'path: /$' "${work_dir}/mcp-ingress.yaml" | grep -q 'number: 80'
+grep -A8 'path: "/"$' "${work_dir}/mcp-ingress.yaml" | grep -q 'number: 80'
 ! grep -q '/.well-known/oauth-' "${work_dir}/ingress.yaml"
 
 readonly digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa

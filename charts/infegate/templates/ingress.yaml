@@ -21,7 +21,7 @@ spec:
     - host: {{ include "infegate.host" . | quote }}
       http:
         paths:
-          - path: /v1
+          - path: "/v1"
             pathType: Prefix
             backend:
               service:
@@ -38,7 +38,7 @@ spec:
                   number: 4000
           {{- end }}
           {{- if eq .Values.api.management.authenticationMode "oidc" }}
-          - path: /oauth/callback
+          - path: "/oauth/callback"
             pathType: Exact
             backend:
               service:
@@ -47,7 +47,7 @@ spec:
                   number: 4000
           {{- end }}
           {{- if .Values.api.subscriptionPassthrough.providers.claude.enabled }}
-          - path: /subscriptions/claude
+          - path: "/subscriptions/claude"
             pathType: Prefix
             backend:
               service:
@@ -67,7 +67,7 @@ spec:
                   number: 3002
           {{- end }}
           {{- end }}
-          - path: /mcp
+          - path: "/mcp"
             pathType: Prefix
             backend:
               service:
@@ -75,7 +75,7 @@ spec:
                 port:
                   number: 3002
           {{- end }}
-          - path: /
+          - path: "/"
             pathType: Exact
             backend:
               service:
