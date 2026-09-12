@@ -30,9 +30,15 @@
     "api": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["replicaCount", "metrics", "image", "database", "management", "oidc", "runtime", "audit", "mcp", "subscriptionPassthrough", "resources", "nodeSelector", "tolerations", "affinity", "topologySpreadConstraints"],
+      "required": ["autoscaling", "podDisruptionBudget", "strategy", "terminationGracePeriodSeconds", "startupProbe", "readinessProbe", "livenessProbe", "metrics", "image", "database", "management", "oidc", "runtime", "audit", "mcp", "subscriptionPassthrough", "resources", "podSecurityContext", "containerSecurityContext", "nodeSelector", "tolerations", "affinity", "topologySpreadConstraints", "defaultTopologySpread"],
       "properties": {
-        "replicaCount": { "type": "integer", "minimum": 1 },
+        "autoscaling": { "$ref": "#/definitions/autoscaling" },
+        "podDisruptionBudget": { "$ref": "#/definitions/podDisruptionBudget" },
+        "strategy": { "$ref": "#/definitions/deploymentStrategy" },
+        "terminationGracePeriodSeconds": { "type": "integer", "minimum": 1 },
+        "startupProbe": { "$ref": "#/definitions/probe" },
+        "readinessProbe": { "$ref": "#/definitions/probe" },
+        "livenessProbe": { "$ref": "#/definitions/probe" },
         "metrics": {
           "type": "object",
           "additionalProperties": false,
@@ -109,21 +115,14 @@
             "retention": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["enabled", "schedule", "payloadDays", "metadataDays", "securityContext", "image", "resources"],
+              "required": ["enabled", "schedule", "payloadDays", "metadataDays", "podSecurityContext", "containerSecurityContext", "image", "resources"],
               "properties": {
                 "enabled": { "type": "boolean" },
                 "schedule": { "type": "string", "minLength": 1 },
                 "payloadDays": { "type": "integer", "minimum": 1 },
                 "metadataDays": { "type": "integer", "minimum": 2 },
-                "securityContext": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "required": ["runAsUser", "runAsGroup"],
-                  "properties": {
-                    "runAsUser": { "type": "integer", "minimum": 1 },
-                    "runAsGroup": { "type": "integer", "minimum": 1 }
-                  }
-                },
+                "podSecurityContext": { "type": "object" },
+                "containerSecurityContext": { "type": "object" },
                 "image": { "$ref": "#/definitions/image" },
                 "resources": { "type": "object" }
               }
@@ -189,24 +188,36 @@
           }
         },
         "resources": { "type": "object" },
+        "podSecurityContext": { "type": "object" },
+        "containerSecurityContext": { "type": "object" },
         "nodeSelector": { "type": "object", "additionalProperties": { "type": "string" } },
         "tolerations": { "type": "array", "items": { "type": "object" } },
         "affinity": { "type": "object" },
-        "topologySpreadConstraints": { "type": "array", "items": { "type": "object" } }
+        "topologySpreadConstraints": { "type": "array", "items": { "type": "object" } },
+        "defaultTopologySpread": { "$ref": "#/definitions/defaultTopologySpread" }
       }
     },
     "ui": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["replicaCount", "image", "resources", "nodeSelector", "tolerations", "affinity", "topologySpreadConstraints"],
+      "required": ["autoscaling", "podDisruptionBudget", "strategy", "terminationGracePeriodSeconds", "startupProbe", "readinessProbe", "livenessProbe", "image", "resources", "podSecurityContext", "containerSecurityContext", "nodeSelector", "tolerations", "affinity", "topologySpreadConstraints", "defaultTopologySpread"],
       "properties": {
-        "replicaCount": { "type": "integer", "minimum": 1 },
+        "autoscaling": { "$ref": "#/definitions/autoscaling" },
+        "podDisruptionBudget": { "$ref": "#/definitions/podDisruptionBudget" },
+        "strategy": { "$ref": "#/definitions/deploymentStrategy" },
+        "terminationGracePeriodSeconds": { "type": "integer", "minimum": 1 },
+        "startupProbe": { "$ref": "#/definitions/probe" },
+        "readinessProbe": { "$ref": "#/definitions/probe" },
+        "livenessProbe": { "$ref": "#/definitions/probe" },
         "image": { "$ref": "#/definitions/image" },
         "resources": { "type": "object" },
+        "podSecurityContext": { "type": "object" },
+        "containerSecurityContext": { "type": "object" },
         "nodeSelector": { "type": "object", "additionalProperties": { "type": "string" } },
         "tolerations": { "type": "array", "items": { "type": "object" } },
         "affinity": { "type": "object" },
-        "topologySpreadConstraints": { "type": "array", "items": { "type": "object" } }
+        "topologySpreadConstraints": { "type": "array", "items": { "type": "object" } },
+        "defaultTopologySpread": { "$ref": "#/definitions/defaultTopologySpread" }
       }
     },
     "ingress": {
@@ -254,6 +265,54 @@
     }
   },
   "definitions": {
+    "deploymentStrategy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "type": "string", "enum": ["RollingUpdate", "Recreate"] },
+        "rollingUpdate": { "type": "object" }
+      }
+    },
+    "probe": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "type": "string", "enum": ["httpGet", "tcpSocket", "exec", "grpc"] },
+        "httpGet": { "type": "object" },
+        "tcpSocket": { "type": "object" },
+        "exec": { "type": "object" },
+        "grpc": { "type": "object" }
+      }
+    },
+    "defaultTopologySpread": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled"],
+      "properties": { "enabled": { "type": "boolean" } }
+    },
+    "podDisruptionBudget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "maxUnavailable"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "maxUnavailable": { "oneOf": [{ "type": "integer", "minimum": 0 }, { "type": "string", "pattern": "^(100|[0-9]{1,2})%$" }] }
+      }
+    },
+    "autoscaling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "minReplicas", "maxReplicas", "behavior"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "minReplicas": { "type": "integer", "minimum": 1 },
+        "maxReplicas": { "type": "integer", "minimum": 1 },
+        "targetCPUUtilizationPercentage": { "type": ["integer", "null"], "minimum": 1, "maximum": 100 },
+        "targetMemoryUtilizationPercentage": { "type": ["integer", "null"], "minimum": 1, "maximum": 100 },
+        "behavior": { "type": "object" }
+      }
+    },
     "image": {
       "type": "object",
       "additionalProperties": false,

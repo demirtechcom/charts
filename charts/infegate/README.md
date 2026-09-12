@@ -8,7 +8,7 @@ an Ingress or Gateway API controller, or Gateway API CRDs.
 
 ## Install
 
-Chart 1.2.0 packages Infegate 1.0.6. Prepare separate Secrets for the database
+Chart 2.0.0 packages Infegate 1.0.6. Prepare separate Secrets for the database
 URL and runtime provider credentials. Native OIDC also needs its own Secret.
 Choose the authentication mode and audit behavior explicitly:
 
@@ -43,7 +43,7 @@ ingress:
 
 ```sh
 helm install infegate oci://ghcr.io/demirtechcom/charts/infegate \
-  --version 1.2.0 --namespace infegate --create-namespace -f values.yaml
+  --version 2.0.0 --namespace infegate --create-namespace -f values.yaml
 ```
 
 ## Native OIDC
@@ -142,6 +142,12 @@ contains only `$INFEGATE_DATABASE_URL`, so `/api/config` cannot expose the
 credential. Both API replicas share hybrid configuration, logs, costs, and
 virtual keys through this database.
 
+Size PostgreSQL for the API connection ceiling before raising autoscaling
+limits. The upper bound is `api.autoscaling.maxReplicas` multiplied by
+`api.database.maxConnections`, which is 150 connections with chart defaults.
+Reserve additional capacity for operators, migrations, retention, and other
+database clients.
+
 Set `api.audit.capturePayloads: false` to retain metadata, usage, timing, and
 cost without prompts or completions. Set it to `true` only when full content
 retention is approved.
@@ -168,7 +174,7 @@ Retention only changes the online database. Backups can preserve deleted rows
 until their own retention window expires.
 
 The retention container runs as PostgreSQL's standard UID and GID 70 by
-default. Override `api.audit.retention.securityContext.runAsUser` and
+default. Override `api.audit.retention.podSecurityContext.runAsUser` and
 `runAsGroup` when the selected image uses different numeric IDs. The database
 URI is passed through `PGDATABASE`, so it does not appear in the process command
 line.
@@ -193,6 +199,43 @@ expects an upstream OAuth service, reads its
 signed assertion from the configured header, and does not expose Infegate's
 native discovery routes. Both modes verify the configured JWKS and audience and
 require an explicit `api.mcp.authorizationRule`.
+
+## Autoscaling and pod placement
+
+API and UI HorizontalPodAutoscalers are enabled by default with three minimum and
+30 maximum replicas. Both use a 70 percent CPU utilization target and require
+Kubernetes resource metrics, normally provided by Metrics Server. Configure
+CPU, memory, and HPA scaling behavior independently under `api.autoscaling` and
+`ui.autoscaling`. The default policy scales up immediately by up to 100 percent
+or four pods per minute and stabilizes scale-down for five minutes.
+
+Set `autoscaling.enabled: false` to let another controller or an operator manage
+replica counts. The Deployments do not render `spec.replicas` in either mode, so
+GitOps reconciliation does not overwrite the active scaler.
+
+Each workload spreads its replicas across zones and nodes by default and exposes
+`nodeSelector`, `affinity`, `tolerations`, and `topologySpreadConstraints` for
+additional placement rules. Disable the generated constraints with
+`defaultTopologySpread.enabled: false`. A PodDisruptionBudget permits one
+unavailable replica, while rolling updates permit one surge pod and no
+unavailable pods. `podSecurityContext` and
+`containerSecurityContext` are also configurable independently for API and UI.
+Their defaults require a non-root process, the runtime-default seccomp profile,
+no privilege escalation, a read-only root filesystem, and no Linux
+capabilities.
+
+Startup, readiness, and liveness probes are configured separately. API
+liveness checks only the local listener so a database outage does not restart
+every replica. Both workloads use a 60 second termination grace period. Resource
+defaults include memory and ephemeral-storage limits; CPU limits are omitted to
+avoid throttling latency-sensitive requests. The chart supports Kubernetes
+1.30 and newer.
+
+Each probe has a `type` discriminator: `httpGet`, `tcpSocket`, `exec`, or
+`grpc`. The chart renders only the selected handler, so changing a probe type
+does not combine the new handler with defaults left behind by Helm value
+merging. Deployment strategy behaves the same way: setting `strategy.type` to
+`Recreate` omits the default `rollingUpdate` block.
 
 ## Image digest pinning
 
@@ -261,10 +304,19 @@ for the resources and listener model used by the chart.
 
 ## Upgrade
 
-Chart 1.2.0 keeps native OIDC as the default, so existing 1.1.0 values continue
-to render without an authentication migration. New installations require a
-clean namespace and PostgreSQL database. Render and inspect the target chart
-and its two image digests before upgrading.
+Chart 2.0.0 removes `api.replicaCount` and `ui.replicaCount`. Remove those keys
+from existing values and configure each workload under `autoscaling`. Rename
+`api.audit.retention.securityContext` to `podSecurityContext` and move
+container-only settings such as `allowPrivilegeEscalation`, capabilities, and
+`readOnlyRootFilesystem` to `containerSecurityContext`.
+
+During an upgrade from 1.x, Helm removes the old Deployment replica field before
+the new HPA reconciles its minimum. This can briefly reduce a workload to one
+replica. Perform the upgrade during a controlled window and verify both HPAs
+have reached `minReplicas` before ending the window. Native
+OIDC remains the default, so no authentication migration is required. New
+installations require a clean namespace and PostgreSQL database. Render and
+inspect the target chart and its two image digests before upgrading.
 
 ## Rollback
 

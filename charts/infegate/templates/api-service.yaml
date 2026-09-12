@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "infegate.componentName" (dict "root" . "component" "api") }}
+  name: {{ include "infegate.componentName" (dict "root" . "component" "api") | quote }}
   labels:
     {{- include "infegate.labels" . | nindent 4 }}
     app.kubernetes.io/component: api

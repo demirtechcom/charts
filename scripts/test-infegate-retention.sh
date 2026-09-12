@@ -38,6 +38,8 @@ helm template infegate "${chart}" \
   > "${work_dir}/cronjob.yaml"
 grep -q '^            runAsUser: 70$' "${work_dir}/cronjob.yaml"
 grep -q '^            runAsGroup: 70$' "${work_dir}/cronjob.yaml"
+grep -q '^                allowPrivilegeEscalation: false$' "${work_dir}/cronjob.yaml"
+grep -q '^                readOnlyRootFilesystem: true$' "${work_dir}/cronjob.yaml"
 grep -q '^                - name: PGDATABASE$' "${work_dir}/cronjob.yaml"
 grep -q 'exec psql --file=/etc/infegate/retention.sql' "${work_dir}/cronjob.yaml"
 ! grep -q -- '--dbname' "${work_dir}/cronjob.yaml"
@@ -54,7 +56,8 @@ docker run --detach --name "${container}" \
   postgres:18-alpine >/dev/null
 
 attempt=0
-until docker exec "${container}" pg_isready --username postgres --dbname infegate >/dev/null 2>&1; do
+until docker exec "${container}" psql --username postgres --dbname infegate \
+  --tuples-only --command='SELECT 1' >/dev/null 2>&1; do
   attempt=$((attempt + 1))
   if test "${attempt}" -ge 60; then
     docker logs "${container}" >&2

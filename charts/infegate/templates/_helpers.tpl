@@ -17,16 +17,16 @@
 
 {{- define "infegate.labels" -}}
 helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | quote }}
-app.kubernetes.io/name: {{ include "infegate.name" . }}
-app.kubernetes.io/instance: {{ .Release.Name }}
+app.kubernetes.io/name: {{ include "infegate.name" . | quote }}
+app.kubernetes.io/instance: {{ .Release.Name | quote }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
-app.kubernetes.io/managed-by: {{ .Release.Service }}
+app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
 {{- end }}
 
 {{- define "infegate.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "infegate.name" .root }}
-app.kubernetes.io/instance: {{ .root.Release.Name }}
-app.kubernetes.io/component: {{ .component }}
+app.kubernetes.io/name: {{ include "infegate.name" .root | quote }}
+app.kubernetes.io/instance: {{ .root.Release.Name | quote }}
+app.kubernetes.io/component: {{ .component | quote }}
 {{- end }}
 
 {{- define "infegate.serviceAccountName" -}}
@@ -59,6 +59,10 @@ app.kubernetes.io/component: {{ .component }}
 {{- $_ = required "api.runtime.existingSecret is required" .Values.api.runtime.existingSecret }}
 {{- if eq .Values.api.audit.capturePayloads nil }}{{ fail "api.audit.capturePayloads must be explicitly true or false" }}{{ end }}
 {{- if and .Values.api.metrics.enabled (has (int .Values.api.metrics.port) (list 3000 3001 3002 4000 15021)) }}{{ fail "api.metrics.port conflicts with a reserved Infegate listener port" }}{{ end }}
+{{- if gt (int .Values.api.autoscaling.minReplicas) (int .Values.api.autoscaling.maxReplicas) }}{{ fail "api.autoscaling.minReplicas must not exceed maxReplicas" }}{{ end }}
+{{- if and .Values.api.autoscaling.enabled (not (or .Values.api.autoscaling.targetCPUUtilizationPercentage .Values.api.autoscaling.targetMemoryUtilizationPercentage)) }}{{ fail "api.autoscaling requires at least one utilization target" }}{{ end }}
+{{- if gt (int .Values.ui.autoscaling.minReplicas) (int .Values.ui.autoscaling.maxReplicas) }}{{ fail "ui.autoscaling.minReplicas must not exceed maxReplicas" }}{{ end }}
+{{- if and .Values.ui.autoscaling.enabled (not (or .Values.ui.autoscaling.targetCPUUtilizationPercentage .Values.ui.autoscaling.targetMemoryUtilizationPercentage)) }}{{ fail "ui.autoscaling requires at least one utilization target" }}{{ end }}
 {{- if .Values.api.mcp.enabled }}
 {{- if eq .Values.api.mcp.authenticationMode "nativeOAuth" }}
 {{- $_ = required "api.oidc.issuer is required when MCP uses native OAuth" .Values.api.oidc.issuer }}
@@ -100,12 +104,27 @@ app.kubernetes.io/component: {{ .component }}
 {{- define "infegate.httpRouteRule" -}}
 - matches:
     - path:
-        type: {{ .type }}
-        value: {{ .path }}
+        type: {{ .type | quote }}
+        value: {{ .path | quote }}
   backendRefs:
     - group: ""
       kind: Service
-      name: {{ include "infegate.componentName" (dict "root" .root "component" .component) }}
+      name: {{ include "infegate.componentName" (dict "root" .root "component" .component) | quote }}
       port: {{ .port }}
       weight: 1
+{{- end }}
+
+{{/* Render exactly one probe handler so Helm map merging cannot combine handlers. */}}
+{{- define "infegate.probe" -}}
+{{- $type := required "probe.type is required" .type -}}
+{{- if not (has $type (list "httpGet" "tcpSocket" "exec" "grpc")) -}}
+{{- fail (printf "unsupported probe.type %q" $type) -}}
+{{- end -}}
+{{- $handler := index . $type -}}
+{{- if not $handler -}}
+{{- fail (printf "probe.%s configuration is required when probe.type is %s" $type $type) -}}
+{{- end -}}
+{{ $type }}:
+{{ toYaml $handler | indent 2 }}
+{{ omit . "type" "httpGet" "tcpSocket" "exec" "grpc" | toYaml }}
 {{- end }}

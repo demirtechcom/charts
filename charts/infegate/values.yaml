@@ -9,7 +9,55 @@ serviceAccount:
   name: ""
 
 api:
-  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 30
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: null
+    behavior:
+      scaleUp:
+        stabilizationWindowSeconds: 0
+        selectPolicy: Max
+        policies:
+          - type: Percent
+            value: 100
+            periodSeconds: 60
+          - type: Pods
+            value: 4
+            periodSeconds: 60
+      scaleDown:
+        stabilizationWindowSeconds: 300
+        policies:
+          - type: Percent
+            value: 25
+            periodSeconds: 60
+  podDisruptionBudget:
+    enabled: true
+    maxUnavailable: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  terminationGracePeriodSeconds: 60
+  startupProbe:
+    type: tcpSocket
+    tcpSocket:
+      port: readiness
+    periodSeconds: 2
+    failureThreshold: 30
+  readinessProbe:
+    type: httpGet
+    httpGet:
+      path: /healthz/ready
+      port: readiness
+    periodSeconds: 5
+  livenessProbe:
+    type: tcpSocket
+    tcpSocket:
+      port: readiness
+    periodSeconds: 10
   metrics:
     enabled: true
     port: 15020
@@ -59,9 +107,17 @@ api:
       schedule: "17 3 * * *"
       payloadDays: 30
       metadataDays: 365
-      securityContext:
+      podSecurityContext:
+        runAsNonRoot: true
         runAsUser: 70
         runAsGroup: 70
+        seccompProfile:
+          type: RuntimeDefault
+      containerSecurityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: [ALL]
+        readOnlyRootFilesystem: true
       image:
         repository: postgres
         tag: 18-alpine
@@ -95,13 +151,78 @@ api:
     requests:
       cpu: 100m
       memory: 128Mi
+      ephemeral-storage: 64Mi
+    limits:
+      memory: 512Mi
+      ephemeral-storage: 256Mi
+  podSecurityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: [ALL]
+    readOnlyRootFilesystem: true
   nodeSelector: {}
   tolerations: []
   affinity: {}
   topologySpreadConstraints: []
+  defaultTopologySpread:
+    enabled: true
 
 ui:
-  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 30
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: null
+    behavior:
+      scaleUp:
+        stabilizationWindowSeconds: 0
+        selectPolicy: Max
+        policies:
+          - type: Percent
+            value: 100
+            periodSeconds: 60
+          - type: Pods
+            value: 4
+            periodSeconds: 60
+      scaleDown:
+        stabilizationWindowSeconds: 300
+        policies:
+          - type: Percent
+            value: 25
+            periodSeconds: 60
+  podDisruptionBudget:
+    enabled: true
+    maxUnavailable: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  terminationGracePeriodSeconds: 60
+  startupProbe:
+    type: httpGet
+    httpGet:
+      path: /healthz
+      port: http
+    periodSeconds: 2
+    failureThreshold: 30
+  readinessProbe:
+    type: httpGet
+    httpGet:
+      path: /healthz
+      port: http
+    periodSeconds: 5
+  livenessProbe:
+    type: httpGet
+    httpGet:
+      path: /healthz
+      port: http
+    periodSeconds: 10
   image:
     repository: ghcr.io/demirtechcom/infegate/ui
     tag: "1.0.6"
@@ -111,10 +232,25 @@ ui:
     requests:
       cpu: 10m
       memory: 32Mi
+      ephemeral-storage: 16Mi
+    limits:
+      memory: 128Mi
+      ephemeral-storage: 64Mi
+  podSecurityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: [ALL]
+    readOnlyRootFilesystem: true
   nodeSelector: {}
   tolerations: []
   affinity: {}
   topologySpreadConstraints: []
+  defaultTopologySpread:
+    enabled: true
 
 ingress:
   enabled: false
