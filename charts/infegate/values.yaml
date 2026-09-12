@@ -78,3 +78,15 @@ ingress:
   annotations: {}
   tls:
     existingSecret: ""
+
+gateway:
+  enabled: false
+  create: true
+  gatewayClassName: ""
+  annotations: {}
+  tls:
+    existingSecret: ""
+  parentRef:
+    name: ""
+    namespace: ""
+    sectionName: ""

@@ -7,6 +7,10 @@ on:
         description: Infegate chart version
         required: true
         type: string
+      app_version:
+        description: Infegate application version packaged by the chart
+        required: false
+        type: string
       ui_digest:
         description: Immutable Infegate UI image digest
         required: true
@@ -57,29 +61,30 @@ jobs:
           permission-contents: read
       - name: Verify dispatch identity
         env:
+          APP_VERSION: ${{ inputs.app_version || inputs.version }}
+          CHART_VERSION: ${{ inputs.version }}
           GATEWAY_DIGEST: ${{ inputs.gateway_digest }}
           SOURCE_RELEASE_ID: ${{ inputs.source_release_id }}
           SOURCE_REPOSITORY: ${{ inputs.source_repository }}
           SOURCE_SHA: ${{ inputs.source_sha }}
           SOURCE_TOKEN: ${{ steps.source-token.outputs.token }}
           UI_DIGEST: ${{ inputs.ui_digest }}
-          VERSION: ${{ inputs.version }}
         shell: bash
         run: |
           set -euo pipefail
-          test "$(awk '$1 == "version:" { print $2 }' charts/infegate/Chart.yaml)" = "${VERSION}"
-          test "$(awk '$1 == "appVersion:" { gsub(/\"/, "", $2); print $2 }' charts/infegate/Chart.yaml)" = "${VERSION}"
+          test "$(awk '$1 == "version:" { print $2 }' charts/infegate/Chart.yaml)" = "${CHART_VERSION}"
+          test "$(awk '$1 == "appVersion:" { gsub(/\"/, "", $2); print $2 }' charts/infegate/Chart.yaml)" = "${APP_VERSION}"
           grep -Eq '^sha256:[a-f0-9]{64}$' <<<"${UI_DIGEST}"
           grep -Eq '^sha256:[a-f0-9]{64}$' <<<"${GATEWAY_DIGEST}"
           release_json="$(curl --fail --silent --show-error \
             --header "Authorization: Bearer ${SOURCE_TOKEN}" \
             --header "X-GitHub-Api-Version: 2022-11-28" \
             "${GITHUB_API_URL}/repos/${SOURCE_REPOSITORY}/releases/${SOURCE_RELEASE_ID}")"
-          jq -e --arg tag "v${VERSION}" '.draft == false and .tag_name == $tag' <<<"${release_json}"
+          jq -e --arg tag "v${APP_VERSION}" '.draft == false and .tag_name == $tag' <<<"${release_json}"
           ref_json="$(curl --fail --silent --show-error \
             --header "Authorization: Bearer ${SOURCE_TOKEN}" \
             --header "X-GitHub-Api-Version: 2022-11-28" \
-            "${GITHUB_API_URL}/repos/${SOURCE_REPOSITORY}/git/ref/tags/v${VERSION}")"
+            "${GITHUB_API_URL}/repos/${SOURCE_REPOSITORY}/git/ref/tags/v${APP_VERSION}")"
           test "$(jq -r '.object.sha' <<<"${ref_json}")" = "${SOURCE_SHA}"
       - name: Validate source chart
         run: ./scripts/check-charts.sh

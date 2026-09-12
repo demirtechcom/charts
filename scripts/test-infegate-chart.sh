@@ -20,6 +20,22 @@ render() {
     "$@"
 }
 
+expect_render_failure() {
+  expected_error=$1
+  shift
+  error_output="${work_dir}/render-error.txt"
+
+  if render "$@" > "${error_output}" 2>&1; then
+    echo "render unexpectedly succeeded: ${expected_error}" >&2
+    exit 1
+  fi
+  grep -Fq "${expected_error}" "${error_output}" || {
+    cat "${error_output}" >&2
+    echo "render did not report: ${expected_error}" >&2
+    exit 1
+  }
+}
+
 render > "${work_dir}/default.yaml"
 grep -q 'name: infegate-api' "${work_dir}/default.yaml"
 grep -q 'name: infegate-ui' "${work_dir}/default.yaml"
@@ -38,6 +54,8 @@ grep -q 'readOnlyRootFilesystem: true' "${work_dir}/default.yaml"
 ! grep -q 'containerPort: 3001' "${work_dir}/default.yaml"
 ! grep -q 'containerPort: 3002' "${work_dir}/default.yaml"
 ! grep -q '^    mcp:$' "${work_dir}/default.yaml"
+! grep -q '^kind: Gateway$' "${work_dir}/default.yaml"
+! grep -q '^kind: HTTPRoute$' "${work_dir}/default.yaml"
 
 render \
   --set api.mcp.enabled=true \
@@ -92,12 +110,105 @@ render --set ingress.enabled=true \
   --set-string ingress.tls.existingSecret=infegate-tls \
   --set api.subscriptionPassthrough.providers.claude.enabled=true \
   > "${work_dir}/ingress.yaml"
-grep -q 'host: ai.customer.example' "${work_dir}/ingress.yaml"
+grep -q 'host: "ai.customer.example"' "${work_dir}/ingress.yaml"
 for path in /v1 /ui /api /cel /oauth/callback /subscriptions/claude; do
   grep -q "path: ${path}" "${work_dir}/ingress.yaml"
 done
 grep -A8 'path: /$' "${work_dir}/ingress.yaml" | grep -q 'number: 80'
 grep -A2 'path: /$' "${work_dir}/ingress.yaml" | grep -q 'pathType: Exact'
+
+render \
+  --set gateway.enabled=true \
+  --set-string gateway.gatewayClassName=example-gateway \
+  --set-string gateway.tls.existingSecret=infegate-tls \
+  --set-string gateway.annotations.owner=platform \
+  > "${work_dir}/managed-gateway.yaml"
+test "$(grep -c '^kind: Gateway$' "${work_dir}/managed-gateway.yaml")" -eq 1
+test "$(grep -c '^kind: HTTPRoute$' "${work_dir}/managed-gateway.yaml")" -eq 1
+grep -q '^  gatewayClassName: example-gateway$' "${work_dir}/managed-gateway.yaml"
+grep -q '^      hostname: "ai.customer.example"$' "${work_dir}/managed-gateway.yaml"
+grep -q '^      port: 443$' "${work_dir}/managed-gateway.yaml"
+grep -q '^      protocol: HTTPS$' "${work_dir}/managed-gateway.yaml"
+grep -q '^[[:space:]]*name: infegate-tls$' "${work_dir}/managed-gateway.yaml"
+grep -q '^    owner: platform$' "${work_dir}/managed-gateway.yaml"
+grep -A5 '^  parentRefs:$' "${work_dir}/managed-gateway.yaml" | grep -q '^    - group: gateway.networking.k8s.io$'
+grep -A5 '^  parentRefs:$' "${work_dir}/managed-gateway.yaml" | grep -q '^      kind: Gateway$'
+grep -A5 '^  parentRefs:$' "${work_dir}/managed-gateway.yaml" | grep -q '^      name: infegate$'
+grep -A5 '^  parentRefs:$' "${work_dir}/managed-gateway.yaml" | grep -q '^      sectionName: https$'
+
+render \
+  --set gateway.enabled=true \
+  --set gateway.create=false \
+  --set-string gateway.parentRef.name=shared-gateway \
+  --set-string gateway.parentRef.namespace=gateway-system \
+  --set-string gateway.parentRef.sectionName=https \
+  > "${work_dir}/existing-gateway.yaml"
+! grep -q '^kind: Gateway$' "${work_dir}/existing-gateway.yaml"
+test "$(grep -c '^kind: HTTPRoute$' "${work_dir}/existing-gateway.yaml")" -eq 1
+grep -A6 '^  parentRefs:$' "${work_dir}/existing-gateway.yaml" | grep -q '^      name: shared-gateway$'
+grep -A6 '^  parentRefs:$' "${work_dir}/existing-gateway.yaml" | grep -q '^      namespace: gateway-system$'
+grep -A6 '^  parentRefs:$' "${work_dir}/existing-gateway.yaml" | grep -q '^      sectionName: https$'
+
+render \
+  --set-string publicUrl=https://ai.customer.example:8443 \
+  --set gateway.enabled=true \
+  --set gateway.create=false \
+  --set-string gateway.parentRef.name=shared-gateway \
+  > "${work_dir}/existing-gateway-port.yaml"
+grep -q '^    - "ai.customer.example"$' "${work_dir}/existing-gateway-port.yaml"
+grep -q 'redirectURI: "https://ai.customer.example:8443/oauth/callback"' "${work_dir}/existing-gateway-port.yaml"
+
+render \
+  --set-string publicUrl=https://ai-staging.lovietech.com \
+  --set gateway.enabled=true \
+  --set gateway.create=false \
+  --set-string gateway.parentRef.name=lovie-gateway \
+  --set-string gateway.parentRef.namespace=lovie \
+  --set api.subscriptionPassthrough.providers.claude.enabled=true \
+  --set api.mcp.enabled=true \
+  --set-string api.mcp.jwksUrl=https://id.customer.example/realms/infegate/protocol/openid-connect/certs \
+  --set-string api.mcp.audiences[0]=infegate \
+  --set-string 'api.mcp.authorizationRule="infegate-mcp-users" in jwt.groups' \
+  > "${work_dir}/lovie-gateway.yaml"
+! grep -q '^kind: Gateway$' "${work_dir}/lovie-gateway.yaml"
+test "$(grep -c '^kind: HTTPRoute$' "${work_dir}/lovie-gateway.yaml")" -eq 1
+grep -q '^    - "ai-staging.lovietech.com"$' "${work_dir}/lovie-gateway.yaml"
+grep -A6 '^  parentRefs:$' "${work_dir}/lovie-gateway.yaml" | grep -q '^    - group: gateway.networking.k8s.io$'
+grep -A6 '^  parentRefs:$' "${work_dir}/lovie-gateway.yaml" | grep -q '^      kind: Gateway$'
+grep -A6 '^  parentRefs:$' "${work_dir}/lovie-gateway.yaml" | grep -q '^      name: lovie-gateway$'
+grep -A6 '^  parentRefs:$' "${work_dir}/lovie-gateway.yaml" | grep -q '^      namespace: lovie$'
+! grep -q 'sectionName:' "${work_dir}/lovie-gateway.yaml"
+
+assert_gateway_route() {
+  path=$1
+  path_type=$2
+  service=$3
+  port=$4
+  route_block="${work_dir}/route-block.yaml"
+
+  if test "${path}" = /; then
+    grep -B2 -A8 'value: /$' "${work_dir}/lovie-gateway.yaml" > "${route_block}"
+  else
+    grep -F -B2 -A8 "value: ${path}" "${work_dir}/lovie-gateway.yaml" > "${route_block}"
+  fi
+  grep -q "type: ${path_type}" "${route_block}"
+  grep -q "name: ${service}" "${route_block}"
+  grep -q "port: ${port}" "${route_block}"
+}
+
+assert_gateway_route /v1 PathPrefix infegate-api 3000
+assert_gateway_route /ui PathPrefix infegate-api 4000
+assert_gateway_route /api PathPrefix infegate-api 4000
+assert_gateway_route /cel PathPrefix infegate-api 4000
+assert_gateway_route /oauth/callback PathPrefix infegate-api 4000
+assert_gateway_route /subscriptions/claude PathPrefix infegate-api 3001
+assert_gateway_route /.well-known/oauth-protected-resource/mcp Exact infegate-api 3002
+assert_gateway_route /.well-known/oauth-authorization-server/mcp Exact infegate-api 3002
+assert_gateway_route /mcp PathPrefix infegate-api 3002
+assert_gateway_route / Exact infegate-ui 80
+test "$(grep -c '^[[:space:]]*- group: ""$' "${work_dir}/lovie-gateway.yaml")" -eq 10
+test "$(grep -c '^          kind: Service$' "${work_dir}/lovie-gateway.yaml")" -eq 10
+test "$(grep -c '^          weight: 1$' "${work_dir}/lovie-gateway.yaml")" -eq 10
 
 render --set ingress.enabled=true \
   --set-string ingress.tls.existingSecret=infegate-tls \
@@ -148,6 +259,31 @@ if render --set-string publicUrl=http://ai.customer.example >/dev/null 2>&1; the
   echo "publicUrl must be an HTTPS origin" >&2
   exit 1
 fi
+expect_render_failure "ingress.enabled and gateway.enabled cannot both be true" \
+  --set ingress.enabled=true \
+  --set-string ingress.tls.existingSecret=infegate-tls \
+  --set gateway.enabled=true \
+  --set-string gateway.gatewayClassName=example-gateway \
+  --set-string gateway.tls.existingSecret=infegate-tls
+expect_render_failure "gateway.gatewayClassName is required when creating a Gateway" \
+  --set gateway.enabled=true \
+  --set-string gateway.tls.existingSecret=infegate-tls
+expect_render_failure "gateway.tls.existingSecret is required when creating a Gateway" \
+  --set gateway.enabled=true \
+  --set-string gateway.gatewayClassName=example-gateway
+expect_render_failure "publicUrl port must be 443 when creating a Gateway" \
+  --set-string publicUrl=https://ai.customer.example:8443 \
+  --set gateway.enabled=true \
+  --set-string gateway.gatewayClassName=example-gateway \
+  --set-string gateway.tls.existingSecret=infegate-tls
+expect_render_failure "publicUrl hostname must be a valid Gateway API hostname" \
+  --set-string publicUrl=https://ai_customer.example \
+  --set gateway.enabled=true \
+  --set gateway.create=false \
+  --set-string gateway.parentRef.name=shared-gateway
+expect_render_failure "gateway.parentRef.name is required when using an existing Gateway" \
+  --set gateway.enabled=true \
+  --set gateway.create=false
 if render --set api.subscriptionPassthrough.providers.openai.enabled=true >/dev/null 2>&1; then
   echo "unknown passthrough providers must fail schema validation" >&2
   exit 1
@@ -155,6 +291,8 @@ fi
 
 readonly release_workflow=.github/workflows/release.yaml
 readonly checkout='actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2'
+grep -q '^version: 1.1.0$' "${chart}/Chart.yaml"
+grep -q '^appVersion: "1.0.6"$' "${chart}/Chart.yaml"
 if grep -Eq 'test "\$\{VERSION\}" = "[0-9]+\.[0-9]+\.[0-9]+"' "${release_workflow}"; then
   echo "chart release workflow must validate the dispatched version against Chart.yaml, not a hardcoded release" >&2
   exit 1
@@ -170,6 +308,13 @@ grep -Fq 'workflow_dispatch:' "${release_workflow}"
 grep -Fq 'ui_digest:' "${release_workflow}"
 grep -Fq 'gateway_digest:' "${release_workflow}"
 grep -Fq 'source_release_id:' "${release_workflow}"
+grep -Fq 'app_version:' "${release_workflow}"
+grep -Fq 'APP_VERSION: ${{ inputs.app_version || inputs.version }}' "${release_workflow}"
+grep -Fq 'CHART_VERSION: ${{ inputs.version }}' "${release_workflow}"
+grep -Fq '= "${CHART_VERSION}"' "${release_workflow}"
+grep -Fq '= "${APP_VERSION}"' "${release_workflow}"
+grep -Fq -- '--arg tag "v${APP_VERSION}"' "${release_workflow}"
+grep -Fq 'git/ref/tags/v${APP_VERSION}' "${release_workflow}"
 grep -Fq 'secrets.RELEASE_APP_ID' "${release_workflow}"
 grep -Fq 'secrets.RELEASE_APP_PRIVATE_KEY' "${release_workflow}"
 grep -Fq 'SOURCE_TOKEN: ${{ steps.source-token.outputs.token }}' "${release_workflow}"
@@ -186,7 +331,7 @@ fi
 
 for heading in "## Install" "## Native OIDC" "## Virtual API keys" "## Claude Code" \
   "## Subscription passthrough" "## PostgreSQL" "## Image digest pinning" \
-  "## Ingress routing" "## Upgrade" "## Rollback"
+  "## Ingress routing" "## Gateway API routing" "## Upgrade" "## Rollback"
 do
   grep -Fqx "${heading}" "${chart}/README.md" || {
     echo "chart README must contain: ${heading}" >&2

@@ -4,11 +4,12 @@ This chart installs Infegate as one product with two independent workloads:
 `infegate-api` runs the pinned agentgateway runtime and `infegate-ui` serves the
 branded static interface. Both use an external PostgreSQL database. The chart
 does not install PostgreSQL, CloudNativePG, an OIDC provider, certificates, or
-an Ingress controller.
+an Ingress or Gateway API controller, or Gateway API CRDs.
 
 ## Install
 
-Infegate 1.0.6 supports clean installations and upgrades from 1.0.0 through 1.0.5. Prepare three distinct
+Chart 1.1.0 packages Infegate 1.0.6, which supports clean installations and
+upgrades from 1.0.0 through 1.0.5. Prepare three distinct
 Secrets for the database URL, OIDC credentials, and runtime provider
 credentials, then install with explicit audit retention behavior:
 
@@ -43,7 +44,7 @@ ingress:
 
 ```sh
 helm install infegate oci://ghcr.io/demirtechcom/charts/infegate \
-  --version 1.0.6 --namespace infegate --create-namespace -f values.yaml
+  --version 1.1.0 --namespace infegate --create-namespace -f values.yaml
 ```
 
 ## Native OIDC
@@ -155,6 +156,95 @@ mandatory.
 The exact root path serves the public Infegate landing page. The UI Service
 remains cluster-internal, unknown root paths return 404, and the management UI
 continues through the OIDC-protected API listener.
+
+## Gateway API routing
+
+Gateway API routing is disabled by default and cannot be enabled together with
+Ingress. The HTTPRoute uses the same hostname and paths listed above. It uses
+`Exact` matching for `/` and the two MCP discovery paths, and `PathPrefix` for
+all other paths.
+
+To create a Gateway with an HTTPS listener, provide the GatewayClass and an
+existing TLS Secret:
+
+```yaml
+gateway:
+  enabled: true
+  create: true
+  gatewayClassName: envoy-gateway
+  tls:
+    existingSecret: infegate-tls
+```
+
+To attach only the HTTPRoute to an existing Gateway, set `create: false` and
+provide its name. The namespace and listener section name are optional:
+
+```yaml
+gateway:
+  enabled: true
+  create: false
+  parentRef:
+    name: shared-gateway
+    namespace: gateway-system
+    sectionName: https
+```
+
+The cluster must already have the Gateway API CRDs and a controller. See the
+[Gateway API HTTP routing guide](https://gateway-api.sigs.k8s.io/guides/user-guides/http-routing/)
+and [TLS configuration guide](https://gateway-api.sigs.k8s.io/guides/user-guides/tls/)
+for the resources and listener model used by the chart.
+
+### Lovie staging
+
+Lovie's `lovie-gateway` accepts HTTPRoutes from every namespace on its HTTP
+listener. TLS terminates at Cloudflare or the NLB layer, so Infegate only needs
+to attach its HTTPRoute:
+
+```yaml
+publicUrl: https://ai-staging.lovietech.com
+
+gateway:
+  enabled: true
+  create: false
+  parentRef:
+    name: lovie-gateway
+    namespace: lovie
+```
+
+| Function | URL |
+| --- | --- |
+| LLM API | `https://ai-staging.lovietech.com/v1` |
+| Management UI | `https://ai-staging.lovietech.com/ui/` |
+| MCP, when enabled | `https://ai-staging.lovietech.com/mcp` |
+| Claude subscription, when enabled | `https://ai-staging.lovietech.com/subscriptions/claude` |
+
+The staging wildcard DNS already sends this hostname pattern to the tunnel.
+Production uses `https://ai.lovie.co`, but `ai` is not yet in Lovie's production
+hostname list. Add the production DNS record and tunnel ingress entry before
+using that hostname.
+
+Lovie's Gateway-level Clerk JWT policy would reject Infegate virtual API keys
+and its own OIDC flow. Apply a route-level Envoy Gateway SecurityPolicy in the
+Infegate namespace to leave authentication to Infegate. The policy must target
+the rendered HTTPRoute name, which is `infegate` for the example release:
+
+```yaml
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: infegate-auth
+  namespace: infegate
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: infegate
+```
+
+Envoy Gateway gives a route-level policy precedence over a Gateway-level policy
+when `mergeType` is unset. The chart does not render this resource because
+SecurityPolicy is specific to Envoy Gateway. See the
+[Envoy Gateway SecurityPolicy precedence rules](https://gateway.envoyproxy.io/docs/concepts/gateway_api_extensions/security-policy/).
 
 ## Upgrade
 
