@@ -40,6 +40,9 @@ app.kubernetes.io/component: {{ .component }}
 {{- define "infegate.validate" -}}
 {{- $publicUrl := required "publicUrl is required" .Values.publicUrl }}
 {{- if not (regexMatch `^https://[^/?#]+$` $publicUrl) }}{{ fail "publicUrl must be an HTTPS origin without a path, query, or fragment" }}{{ end }}
+{{- $publicUrlParts := urlParse $publicUrl }}
+{{- $publicUrlHost := get $publicUrlParts "host" }}
+{{- $publicUrlHostname := get $publicUrlParts "hostname" }}
 {{- $_ := required "api.database.existingSecret is required" .Values.api.database.existingSecret }}
 {{- $_ = required "api.oidc.issuer is required" .Values.api.oidc.issuer }}
 {{- $_ = required "api.oidc.clientId is required" .Values.api.oidc.clientId }}
@@ -56,7 +59,10 @@ app.kubernetes.io/component: {{ .component }}
 {{- if and .Values.ingress.enabled .Values.gateway.enabled }}{{ fail "ingress.enabled and gateway.enabled cannot both be true" }}{{ end }}
 {{- if .Values.ingress.enabled }}{{ $_ = required "ingress.tls.existingSecret is required when ingress is enabled" .Values.ingress.tls.existingSecret }}{{ end }}
 {{- if .Values.gateway.enabled }}
+{{- if not (regexMatch `^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$` $publicUrlHostname) }}{{ fail "publicUrl hostname must be a valid Gateway API hostname" }}{{ end }}
 {{- if .Values.gateway.create }}
+{{- $publicUrlPort := regexFind `:[0-9]+$` $publicUrlHost }}
+{{- if and $publicUrlPort (ne $publicUrlPort ":443") }}{{ fail "publicUrl port must be 443 when creating a Gateway" }}{{ end }}
 {{- $_ = required "gateway.gatewayClassName is required when creating a Gateway" .Values.gateway.gatewayClassName }}
 {{- $_ = required "gateway.tls.existingSecret is required when creating a Gateway" .Values.gateway.tls.existingSecret }}
 {{- else }}
@@ -66,7 +72,7 @@ app.kubernetes.io/component: {{ .component }}
 {{- end }}
 
 {{- define "infegate.host" -}}
-{{- regexReplaceAll `^https://` .Values.publicUrl "" }}
+{{- get (urlParse .Values.publicUrl) "hostname" }}
 {{- end }}
 
 {{- define "infegate.httpRouteRule" -}}

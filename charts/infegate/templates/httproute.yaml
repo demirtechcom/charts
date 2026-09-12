@@ -22,7 +22,7 @@ spec:
       {{- end }}
       {{- end }}
   hostnames:
-    - {{ include "infegate.host" . }}
+    - {{ include "infegate.host" . | quote }}
   rules:
     {{- include "infegate.httpRouteRule" (dict "root" . "path" "/v1" "type" "PathPrefix" "component" "api" "port" 3000) | nindent 4 }}
     {{- range list "/ui" "/api" "/cel" "/oauth/callback" }}

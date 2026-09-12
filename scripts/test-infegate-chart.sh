@@ -110,7 +110,7 @@ render --set ingress.enabled=true \
   --set-string ingress.tls.existingSecret=infegate-tls \
   --set api.subscriptionPassthrough.providers.claude.enabled=true \
   > "${work_dir}/ingress.yaml"
-grep -q 'host: ai.customer.example' "${work_dir}/ingress.yaml"
+grep -q 'host: "ai.customer.example"' "${work_dir}/ingress.yaml"
 for path in /v1 /ui /api /cel /oauth/callback /subscriptions/claude; do
   grep -q "path: ${path}" "${work_dir}/ingress.yaml"
 done
@@ -126,7 +126,7 @@ render \
 test "$(grep -c '^kind: Gateway$' "${work_dir}/managed-gateway.yaml")" -eq 1
 test "$(grep -c '^kind: HTTPRoute$' "${work_dir}/managed-gateway.yaml")" -eq 1
 grep -q '^  gatewayClassName: example-gateway$' "${work_dir}/managed-gateway.yaml"
-grep -q '^      hostname: ai.customer.example$' "${work_dir}/managed-gateway.yaml"
+grep -q '^      hostname: "ai.customer.example"$' "${work_dir}/managed-gateway.yaml"
 grep -q '^      port: 443$' "${work_dir}/managed-gateway.yaml"
 grep -q '^      protocol: HTTPS$' "${work_dir}/managed-gateway.yaml"
 grep -q '^[[:space:]]*name: infegate-tls$' "${work_dir}/managed-gateway.yaml"
@@ -150,6 +150,15 @@ grep -A6 '^  parentRefs:$' "${work_dir}/existing-gateway.yaml" | grep -q '^     
 grep -A6 '^  parentRefs:$' "${work_dir}/existing-gateway.yaml" | grep -q '^      sectionName: https$'
 
 render \
+  --set-string publicUrl=https://ai.customer.example:8443 \
+  --set gateway.enabled=true \
+  --set gateway.create=false \
+  --set-string gateway.parentRef.name=shared-gateway \
+  > "${work_dir}/existing-gateway-port.yaml"
+grep -q '^    - "ai.customer.example"$' "${work_dir}/existing-gateway-port.yaml"
+grep -q 'redirectURI: "https://ai.customer.example:8443/oauth/callback"' "${work_dir}/existing-gateway-port.yaml"
+
+render \
   --set-string publicUrl=https://ai-staging.lovietech.com \
   --set gateway.enabled=true \
   --set gateway.create=false \
@@ -163,7 +172,7 @@ render \
   > "${work_dir}/lovie-gateway.yaml"
 ! grep -q '^kind: Gateway$' "${work_dir}/lovie-gateway.yaml"
 test "$(grep -c '^kind: HTTPRoute$' "${work_dir}/lovie-gateway.yaml")" -eq 1
-grep -q '^    - ai-staging.lovietech.com$' "${work_dir}/lovie-gateway.yaml"
+grep -q '^    - "ai-staging.lovietech.com"$' "${work_dir}/lovie-gateway.yaml"
 grep -A6 '^  parentRefs:$' "${work_dir}/lovie-gateway.yaml" | grep -q '^    - group: gateway.networking.k8s.io$'
 grep -A6 '^  parentRefs:$' "${work_dir}/lovie-gateway.yaml" | grep -q '^      kind: Gateway$'
 grep -A6 '^  parentRefs:$' "${work_dir}/lovie-gateway.yaml" | grep -q '^      name: lovie-gateway$'
@@ -262,6 +271,16 @@ expect_render_failure "gateway.gatewayClassName is required when creating a Gate
 expect_render_failure "gateway.tls.existingSecret is required when creating a Gateway" \
   --set gateway.enabled=true \
   --set-string gateway.gatewayClassName=example-gateway
+expect_render_failure "publicUrl port must be 443 when creating a Gateway" \
+  --set-string publicUrl=https://ai.customer.example:8443 \
+  --set gateway.enabled=true \
+  --set-string gateway.gatewayClassName=example-gateway \
+  --set-string gateway.tls.existingSecret=infegate-tls
+expect_render_failure "publicUrl hostname must be a valid Gateway API hostname" \
+  --set-string publicUrl=https://ai_customer.example \
+  --set gateway.enabled=true \
+  --set gateway.create=false \
+  --set-string gateway.parentRef.name=shared-gateway
 expect_render_failure "gateway.parentRef.name is required when using an existing Gateway" \
   --set gateway.enabled=true \
   --set gateway.create=false

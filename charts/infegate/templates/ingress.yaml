@@ -15,10 +15,10 @@ spec:
   {{- end }}
   tls:
     - hosts:
-        - {{ include "infegate.host" . }}
+        - {{ include "infegate.host" . | quote }}
       secretName: {{ .Values.ingress.tls.existingSecret }}
   rules:
-    - host: {{ include "infegate.host" . }}
+    - host: {{ include "infegate.host" . | quote }}
       http:
         paths:
           - path: /v1

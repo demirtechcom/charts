@@ -13,7 +13,7 @@ spec:
   gatewayClassName: {{ .Values.gateway.gatewayClassName }}
   listeners:
     - name: https
-      hostname: {{ include "infegate.host" . }}
+      hostname: {{ include "infegate.host" . | quote }}
       port: 443
       protocol: HTTPS
       tls:
