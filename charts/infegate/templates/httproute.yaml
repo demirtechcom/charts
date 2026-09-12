@@ -11,7 +11,7 @@ spec:
       kind: Gateway
       {{- if .Values.gateway.create }}
       name: {{ include "infegate.fullname" . | quote }}
-      sectionName: https
+      sectionName: "https"
       {{- else }}
       name: {{ .Values.gateway.parentRef.name | quote }}
       {{- with .Values.gateway.parentRef.namespace }}
