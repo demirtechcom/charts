@@ -28,7 +28,7 @@ api:
       issuer: ""
       audiences: []
       jwksUrl: ""
-      headerName: Cf-Access-Jwt-Assertion
+      headerName: X-Forwarded-Jwt
       authorizationRule: ""
   oidc:
     issuer: ""
@@ -50,7 +50,6 @@ api:
       - proxy-authorization
       - cookie
       - set-cookie
-      - cf-access-jwt-assertion
       - x-infegate-key
       - x-api-key
       - api-key
@@ -79,7 +78,7 @@ api:
     enabled: false
     authenticationMode: nativeOAuth
     issuer: ""
-    headerName: Cf-Access-Jwt-Assertion
+    headerName: X-Forwarded-Jwt
     jwksUrl: ""
     audiences: []
     authorizationRule: ""
