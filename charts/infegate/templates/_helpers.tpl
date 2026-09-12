@@ -53,9 +53,31 @@ app.kubernetes.io/component: {{ .component }}
 {{- $_ = required "api.mcp.authorizationRule is required when MCP is enabled" .Values.api.mcp.authorizationRule }}
 {{- end }}
 {{- if or (eq .Values.api.database.existingSecret .Values.api.oidc.existingSecret) (eq .Values.api.database.existingSecret .Values.api.runtime.existingSecret) (eq .Values.api.oidc.existingSecret .Values.api.runtime.existingSecret) }}{{ fail "database, OIDC, and runtime Secret names must be distinct" }}{{ end }}
+{{- if and .Values.ingress.enabled .Values.gateway.enabled }}{{ fail "ingress.enabled and gateway.enabled cannot both be true" }}{{ end }}
 {{- if .Values.ingress.enabled }}{{ $_ = required "ingress.tls.existingSecret is required when ingress is enabled" .Values.ingress.tls.existingSecret }}{{ end }}
+{{- if .Values.gateway.enabled }}
+{{- if .Values.gateway.create }}
+{{- $_ = required "gateway.gatewayClassName is required when creating a Gateway" .Values.gateway.gatewayClassName }}
+{{- $_ = required "gateway.tls.existingSecret is required when creating a Gateway" .Values.gateway.tls.existingSecret }}
+{{- else }}
+{{- $_ = required "gateway.parentRef.name is required when using an existing Gateway" .Values.gateway.parentRef.name }}
+{{- end }}
+{{- end }}
 {{- end }}
 
 {{- define "infegate.host" -}}
 {{- regexReplaceAll `^https://` .Values.publicUrl "" }}
+{{- end }}
+
+{{- define "infegate.httpRouteRule" -}}
+- matches:
+    - path:
+        type: {{ .type }}
+        value: {{ .path }}
+  backendRefs:
+    - group: ""
+      kind: Service
+      name: {{ include "infegate.componentName" (dict "root" .root "component" .component) }}
+      port: {{ .port }}
+      weight: 1
 {{- end }}

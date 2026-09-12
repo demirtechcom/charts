@@ -3,7 +3,7 @@
   "title": "Infegate 1.0.6 values",
   "type": "object",
   "additionalProperties": false,
-  "required": ["publicUrl", "api", "ui", "ingress"],
+  "required": ["publicUrl", "api", "ui", "ingress", "gateway"],
   "properties": {
     "publicUrl": { "type": "string" },
     "nameOverride": { "type": "string" },
@@ -159,6 +159,33 @@
           "additionalProperties": false,
           "required": ["existingSecret"],
           "properties": { "existingSecret": { "type": "string" } }
+        }
+      }
+    },
+    "gateway": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "create", "gatewayClassName", "annotations", "tls", "parentRef"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "create": { "type": "boolean" },
+        "gatewayClassName": { "type": "string" },
+        "annotations": { "type": "object", "additionalProperties": { "type": "string" } },
+        "tls": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["existingSecret"],
+          "properties": { "existingSecret": { "type": "string" } }
+        },
+        "parentRef": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "namespace", "sectionName"],
+          "properties": {
+            "name": { "type": "string" },
+            "namespace": { "type": "string" },
+            "sectionName": { "type": "string" }
+          }
         }
       }
     }
