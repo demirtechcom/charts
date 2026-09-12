@@ -272,6 +272,8 @@ fi
 
 readonly release_workflow=.github/workflows/release.yaml
 readonly checkout='actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2'
+grep -q '^version: 1.1.0$' "${chart}/Chart.yaml"
+grep -q '^appVersion: "1.0.6"$' "${chart}/Chart.yaml"
 if grep -Eq 'test "\$\{VERSION\}" = "[0-9]+\.[0-9]+\.[0-9]+"' "${release_workflow}"; then
   echo "chart release workflow must validate the dispatched version against Chart.yaml, not a hardcoded release" >&2
   exit 1
@@ -287,6 +289,13 @@ grep -Fq 'workflow_dispatch:' "${release_workflow}"
 grep -Fq 'ui_digest:' "${release_workflow}"
 grep -Fq 'gateway_digest:' "${release_workflow}"
 grep -Fq 'source_release_id:' "${release_workflow}"
+grep -Fq 'app_version:' "${release_workflow}"
+grep -Fq 'APP_VERSION: ${{ inputs.app_version || inputs.version }}' "${release_workflow}"
+grep -Fq 'CHART_VERSION: ${{ inputs.version }}' "${release_workflow}"
+grep -Fq '= "${CHART_VERSION}"' "${release_workflow}"
+grep -Fq '= "${APP_VERSION}"' "${release_workflow}"
+grep -Fq -- '--arg tag "v${APP_VERSION}"' "${release_workflow}"
+grep -Fq 'git/ref/tags/v${APP_VERSION}' "${release_workflow}"
 grep -Fq 'secrets.RELEASE_APP_ID' "${release_workflow}"
 grep -Fq 'secrets.RELEASE_APP_PRIVATE_KEY' "${release_workflow}"
 grep -Fq 'SOURCE_TOKEN: ${{ steps.source-token.outputs.token }}' "${release_workflow}"

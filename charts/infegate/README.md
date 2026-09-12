@@ -8,7 +8,8 @@ an Ingress or Gateway API controller, or Gateway API CRDs.
 
 ## Install
 
-Infegate 1.0.6 supports clean installations and upgrades from 1.0.0 through 1.0.5. Prepare three distinct
+Chart 1.1.0 packages Infegate 1.0.6, which supports clean installations and
+upgrades from 1.0.0 through 1.0.5. Prepare three distinct
 Secrets for the database URL, OIDC credentials, and runtime provider
 credentials, then install with explicit audit retention behavior:
 
@@ -43,7 +44,7 @@ ingress:
 
 ```sh
 helm install infegate oci://ghcr.io/demirtechcom/charts/infegate \
-  --version 1.0.6 --namespace infegate --create-namespace -f values.yaml
+  --version 1.1.0 --namespace infegate --create-namespace -f values.yaml
 ```
 
 ## Native OIDC
