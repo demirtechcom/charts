@@ -39,7 +39,11 @@ expect_render_failure() {
 render > "${work_dir}/default.yaml"
 grep -q 'name: infegate-api' "${work_dir}/default.yaml"
 grep -q 'name: infegate-ui' "${work_dir}/default.yaml"
-test "$(grep -c '^  replicas: 2$' "${work_dir}/default.yaml")" -eq 2
+! grep -q '^  replicas:' "${work_dir}/default.yaml"
+test "$(grep -c '^kind: HorizontalPodAutoscaler$' "${work_dir}/default.yaml")" -eq 2
+test "$(grep -c '^  minReplicas: 2$' "${work_dir}/default.yaml")" -eq 2
+test "$(grep -c '^  maxReplicas: 10$' "${work_dir}/default.yaml")" -eq 2
+test "$(grep -c '^          averageUtilization: 70$' "${work_dir}/default.yaml")" -eq 2
 grep -q 'image: "ghcr.io/demirtechcom/infegate/gateway:1.0.6"' "${work_dir}/default.yaml"
 grep -q 'image: "ghcr.io/demirtechcom/infegate/ui:1.0.6"' "${work_dir}/default.yaml"
 grep -q 'url: \$INFEGATE_DATABASE_URL' "${work_dir}/default.yaml"
@@ -60,6 +64,36 @@ grep -q 'containerPort: 15020' "${work_dir}/default.yaml"
 ! grep -q '^    mcp:$' "${work_dir}/default.yaml"
 ! grep -q '^kind: Gateway$' "${work_dir}/default.yaml"
 ! grep -q '^kind: HTTPRoute$' "${work_dir}/default.yaml"
+
+render \
+  --set api.autoscaling.enabled=false \
+  --set ui.autoscaling.enabled=false \
+  > "${work_dir}/autoscaling-disabled.yaml"
+! grep -q '^kind: HorizontalPodAutoscaler$' "${work_dir}/autoscaling-disabled.yaml"
+! grep -q '^  replicas:' "${work_dir}/autoscaling-disabled.yaml"
+
+render \
+  --set api.autoscaling.targetMemoryUtilizationPercentage=80 \
+  --set api.autoscaling.behavior.scaleDown.stabilizationWindowSeconds=300 \
+  > "${work_dir}/autoscaling-custom.yaml"
+grep -q '^        name: memory$' "${work_dir}/autoscaling-custom.yaml"
+grep -q '^          averageUtilization: 80$' "${work_dir}/autoscaling-custom.yaml"
+grep -q '^      stabilizationWindowSeconds: 300$' "${work_dir}/autoscaling-custom.yaml"
+
+render \
+  --set api.podSecurityContext.runAsUser=10001 \
+  --set api.podSecurityContext.runAsGroup=10001 \
+  --set api.containerSecurityContext.runAsUser=10001 \
+  --set ui.podSecurityContext.runAsUser=10002 \
+  --set ui.podSecurityContext.runAsGroup=10002 \
+  --set ui.containerSecurityContext.runAsUser=10002 \
+  > "${work_dir}/security-context.yaml"
+grep -q '^        runAsUser: 10001$' "${work_dir}/security-context.yaml"
+grep -q '^        runAsGroup: 10001$' "${work_dir}/security-context.yaml"
+grep -q '^            runAsUser: 10001$' "${work_dir}/security-context.yaml"
+grep -q '^        runAsUser: 10002$' "${work_dir}/security-context.yaml"
+grep -q '^        runAsGroup: 10002$' "${work_dir}/security-context.yaml"
+grep -q '^            runAsUser: 10002$' "${work_dir}/security-context.yaml"
 
 render --set api.metrics.enabled=false > "${work_dir}/metrics-disabled.yaml"
 grep -q 'statsAddr: "off"' "${work_dir}/metrics-disabled.yaml"
@@ -352,6 +386,24 @@ for reserved_port in 3000 3001 3002 4000 15021; do
   expect_render_failure "api.metrics.port conflicts with a reserved Infegate listener port" \
     --set api.metrics.port="${reserved_port}"
 done
+expect_render_failure "api.autoscaling.minReplicas must not exceed maxReplicas" \
+  --set api.autoscaling.minReplicas=5 \
+  --set api.autoscaling.maxReplicas=4
+if render \
+  --set api.autoscaling.targetCPUUtilizationPercentage=null \
+  --set api.autoscaling.targetMemoryUtilizationPercentage=null >/dev/null 2>&1; then
+  echo "api autoscaling must require at least one utilization target" >&2
+  exit 1
+fi
+expect_render_failure "ui.autoscaling.minReplicas must not exceed maxReplicas" \
+  --set ui.autoscaling.minReplicas=5 \
+  --set ui.autoscaling.maxReplicas=4
+if render \
+  --set ui.autoscaling.targetCPUUtilizationPercentage=null \
+  --set ui.autoscaling.targetMemoryUtilizationPercentage=null >/dev/null 2>&1; then
+  echo "ui autoscaling must require at least one utilization target" >&2
+  exit 1
+fi
 if render --set api.subscriptionPassthrough.providers.openai.enabled=true >/dev/null 2>&1; then
   echo "unknown passthrough providers must fail schema validation" >&2
   exit 1
@@ -359,7 +411,7 @@ fi
 
 readonly release_workflow=.github/workflows/release.yaml
 readonly checkout='actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2'
-grep -q '^version: 1.2.0$' "${chart}/Chart.yaml"
+grep -q '^version: 2.0.0$' "${chart}/Chart.yaml"
 grep -q '^appVersion: "1.0.6"$' "${chart}/Chart.yaml"
 if grep -Eq 'test "\$\{VERSION\}" = "[0-9]+\.[0-9]+\.[0-9]+"' "${release_workflow}"; then
   echo "chart release workflow must validate the dispatched version against Chart.yaml, not a hardcoded release" >&2

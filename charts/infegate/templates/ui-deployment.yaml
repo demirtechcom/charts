@@ -6,7 +6,6 @@ metadata:
     {{- include "infegate.labels" . | nindent 4 }}
     app.kubernetes.io/component: ui
 spec:
-  replicas: {{ .Values.ui.replicaCount }}
   selector:
     matchLabels:
       {{- include "infegate.selectorLabels" (dict "root" . "component" "ui") | nindent 6 }}
@@ -18,9 +17,7 @@ spec:
       automountServiceAccountToken: false
       serviceAccountName: {{ include "infegate.serviceAccountName" . }}
       securityContext:
-        runAsNonRoot: true
-        seccompProfile:
-          type: RuntimeDefault
+        {{- toYaml .Values.ui.podSecurityContext | nindent 8 }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -30,10 +27,7 @@ spec:
           image: {{ include "infegate.image" (dict "image" .Values.ui.image) | quote }}
           imagePullPolicy: {{ .Values.ui.image.pullPolicy }}
           securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: [ALL]
-            readOnlyRootFilesystem: true
+            {{- toYaml .Values.ui.containerSecurityContext | nindent 12 }}
           ports:
             - name: http
               containerPort: 8080

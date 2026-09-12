@@ -22,11 +22,7 @@ spec:
           automountServiceAccountToken: false
           restartPolicy: Never
           securityContext:
-            runAsNonRoot: true
-            runAsUser: {{ .Values.api.audit.retention.securityContext.runAsUser }}
-            runAsGroup: {{ .Values.api.audit.retention.securityContext.runAsGroup }}
-            seccompProfile:
-              type: RuntimeDefault
+            {{- toYaml .Values.api.audit.retention.podSecurityContext | nindent 12 }}
           containers:
             - name: retention
               image: {{ include "infegate.image" (dict "image" .Values.api.audit.retention.image) | quote }}
@@ -35,10 +31,7 @@ spec:
               args:
                 - exec psql --file=/etc/infegate/retention.sql
               securityContext:
-                allowPrivilegeEscalation: false
-                capabilities:
-                  drop: [ALL]
-                readOnlyRootFilesystem: true
+                {{- toYaml .Values.api.audit.retention.containerSecurityContext | nindent 16 }}
               env:
                 - name: PGDATABASE
                   valueFrom:

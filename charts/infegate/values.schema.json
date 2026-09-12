@@ -30,9 +30,9 @@
     "api": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["replicaCount", "metrics", "image", "database", "management", "oidc", "runtime", "audit", "mcp", "subscriptionPassthrough", "resources", "nodeSelector", "tolerations", "affinity", "topologySpreadConstraints"],
+      "required": ["autoscaling", "metrics", "image", "database", "management", "oidc", "runtime", "audit", "mcp", "subscriptionPassthrough", "resources", "podSecurityContext", "containerSecurityContext", "nodeSelector", "tolerations", "affinity", "topologySpreadConstraints"],
       "properties": {
-        "replicaCount": { "type": "integer", "minimum": 1 },
+        "autoscaling": { "$ref": "#/definitions/autoscaling" },
         "metrics": {
           "type": "object",
           "additionalProperties": false,
@@ -109,21 +109,14 @@
             "retention": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["enabled", "schedule", "payloadDays", "metadataDays", "securityContext", "image", "resources"],
+              "required": ["enabled", "schedule", "payloadDays", "metadataDays", "podSecurityContext", "containerSecurityContext", "image", "resources"],
               "properties": {
                 "enabled": { "type": "boolean" },
                 "schedule": { "type": "string", "minLength": 1 },
                 "payloadDays": { "type": "integer", "minimum": 1 },
                 "metadataDays": { "type": "integer", "minimum": 2 },
-                "securityContext": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "required": ["runAsUser", "runAsGroup"],
-                  "properties": {
-                    "runAsUser": { "type": "integer", "minimum": 1 },
-                    "runAsGroup": { "type": "integer", "minimum": 1 }
-                  }
-                },
+                "podSecurityContext": { "type": "object" },
+                "containerSecurityContext": { "type": "object" },
                 "image": { "$ref": "#/definitions/image" },
                 "resources": { "type": "object" }
               }
@@ -189,6 +182,8 @@
           }
         },
         "resources": { "type": "object" },
+        "podSecurityContext": { "type": "object" },
+        "containerSecurityContext": { "type": "object" },
         "nodeSelector": { "type": "object", "additionalProperties": { "type": "string" } },
         "tolerations": { "type": "array", "items": { "type": "object" } },
         "affinity": { "type": "object" },
@@ -198,11 +193,13 @@
     "ui": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["replicaCount", "image", "resources", "nodeSelector", "tolerations", "affinity", "topologySpreadConstraints"],
+      "required": ["autoscaling", "image", "resources", "podSecurityContext", "containerSecurityContext", "nodeSelector", "tolerations", "affinity", "topologySpreadConstraints"],
       "properties": {
-        "replicaCount": { "type": "integer", "minimum": 1 },
+        "autoscaling": { "$ref": "#/definitions/autoscaling" },
         "image": { "$ref": "#/definitions/image" },
         "resources": { "type": "object" },
+        "podSecurityContext": { "type": "object" },
+        "containerSecurityContext": { "type": "object" },
         "nodeSelector": { "type": "object", "additionalProperties": { "type": "string" } },
         "tolerations": { "type": "array", "items": { "type": "object" } },
         "affinity": { "type": "object" },
@@ -254,6 +251,19 @@
     }
   },
   "definitions": {
+    "autoscaling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "minReplicas", "maxReplicas", "targetCPUUtilizationPercentage", "targetMemoryUtilizationPercentage", "behavior"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "minReplicas": { "type": "integer", "minimum": 1 },
+        "maxReplicas": { "type": "integer", "minimum": 1 },
+        "targetCPUUtilizationPercentage": { "type": ["integer", "null"], "minimum": 1, "maximum": 100 },
+        "targetMemoryUtilizationPercentage": { "type": ["integer", "null"], "minimum": 1, "maximum": 100 },
+        "behavior": { "type": "object" }
+      }
+    },
     "image": {
       "type": "object",
       "additionalProperties": false,

@@ -8,7 +8,7 @@ an Ingress or Gateway API controller, or Gateway API CRDs.
 
 ## Install
 
-Chart 1.2.0 packages Infegate 1.0.6. Prepare separate Secrets for the database
+Chart 2.0.0 packages Infegate 1.0.6. Prepare separate Secrets for the database
 URL and runtime provider credentials. Native OIDC also needs its own Secret.
 Choose the authentication mode and audit behavior explicitly:
 
@@ -43,7 +43,7 @@ ingress:
 
 ```sh
 helm install infegate oci://ghcr.io/demirtechcom/charts/infegate \
-  --version 1.2.0 --namespace infegate --create-namespace -f values.yaml
+  --version 2.0.0 --namespace infegate --create-namespace -f values.yaml
 ```
 
 ## Native OIDC
@@ -168,7 +168,7 @@ Retention only changes the online database. Backups can preserve deleted rows
 until their own retention window expires.
 
 The retention container runs as PostgreSQL's standard UID and GID 70 by
-default. Override `api.audit.retention.securityContext.runAsUser` and
+default. Override `api.audit.retention.podSecurityContext.runAsUser` and
 `runAsGroup` when the selected image uses different numeric IDs. The database
 URI is passed through `PGDATABASE`, so it does not appear in the process command
 line.
@@ -193,6 +193,25 @@ expects an upstream OAuth service, reads its
 signed assertion from the configured header, and does not expose Infegate's
 native discovery routes. Both modes verify the configured JWKS and audience and
 require an explicit `api.mcp.authorizationRule`.
+
+## Autoscaling and pod placement
+
+API and UI HorizontalPodAutoscalers are enabled by default with two minimum and
+ten maximum replicas. Both use a 70 percent CPU utilization target and require
+Kubernetes resource metrics, normally provided by Metrics Server. Configure
+CPU, memory, and HPA scaling behavior independently under `api.autoscaling` and
+`ui.autoscaling`.
+
+Set `autoscaling.enabled: false` to let another controller or an operator manage
+replica counts. The Deployments do not render `spec.replicas` in either mode, so
+GitOps reconciliation does not overwrite the active scaler.
+
+Each workload exposes `nodeSelector`, `affinity`, `tolerations`, and
+`topologySpreadConstraints` for placement. `podSecurityContext` and
+`containerSecurityContext` are also configurable independently for API and UI.
+Their defaults require a non-root process, the runtime-default seccomp profile,
+no privilege escalation, a read-only root filesystem, and no Linux
+capabilities.
 
 ## Image digest pinning
 
@@ -261,10 +280,11 @@ for the resources and listener model used by the chart.
 
 ## Upgrade
 
-Chart 1.2.0 keeps native OIDC as the default, so existing 1.1.0 values continue
-to render without an authentication migration. New installations require a
-clean namespace and PostgreSQL database. Render and inspect the target chart
-and its two image digests before upgrading.
+Chart 2.0.0 removes `api.replicaCount` and `ui.replicaCount`. Remove those keys
+from existing values and configure each workload under `autoscaling`. Native
+OIDC remains the default, so no authentication migration is required. New
+installations require a clean namespace and PostgreSQL database. Render and
+inspect the target chart and its two image digests before upgrading.
 
 ## Rollback
 

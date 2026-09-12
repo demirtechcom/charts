@@ -38,6 +38,8 @@ helm template infegate "${chart}" \
   > "${work_dir}/cronjob.yaml"
 grep -q '^            runAsUser: 70$' "${work_dir}/cronjob.yaml"
 grep -q '^            runAsGroup: 70$' "${work_dir}/cronjob.yaml"
+grep -q '^                allowPrivilegeEscalation: false$' "${work_dir}/cronjob.yaml"
+grep -q '^                readOnlyRootFilesystem: true$' "${work_dir}/cronjob.yaml"
 grep -q '^                - name: PGDATABASE$' "${work_dir}/cronjob.yaml"
 grep -q 'exec psql --file=/etc/infegate/retention.sql' "${work_dir}/cronjob.yaml"
 ! grep -q -- '--dbname' "${work_dir}/cronjob.yaml"
