@@ -17,16 +17,16 @@
 
 {{- define "infegate.labels" -}}
 helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | quote }}
-app.kubernetes.io/name: {{ include "infegate.name" . }}
-app.kubernetes.io/instance: {{ .Release.Name }}
+app.kubernetes.io/name: {{ include "infegate.name" . | quote }}
+app.kubernetes.io/instance: {{ .Release.Name | quote }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
-app.kubernetes.io/managed-by: {{ .Release.Service }}
+app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
 {{- end }}
 
 {{- define "infegate.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "infegate.name" .root }}
-app.kubernetes.io/instance: {{ .root.Release.Name }}
-app.kubernetes.io/component: {{ .component }}
+app.kubernetes.io/name: {{ include "infegate.name" .root | quote }}
+app.kubernetes.io/instance: {{ .root.Release.Name | quote }}
+app.kubernetes.io/component: {{ .component | quote }}
 {{- end }}
 
 {{- define "infegate.serviceAccountName" -}}
@@ -104,12 +104,12 @@ app.kubernetes.io/component: {{ .component }}
 {{- define "infegate.httpRouteRule" -}}
 - matches:
     - path:
-        type: {{ .type }}
-        value: {{ .path }}
+        type: {{ .type | quote }}
+        value: {{ .path | quote }}
   backendRefs:
     - group: ""
       kind: Service
-      name: {{ include "infegate.componentName" (dict "root" .root "component" .component) }}
+      name: {{ include "infegate.componentName" (dict "root" .root "component" .component) | quote }}
       port: {{ .port }}
       weight: 1
 {{- end }}

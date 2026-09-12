@@ -1,11 +1,13 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "infegate.componentName" (dict "root" . "component" "ui") }}
+  name: {{ include "infegate.componentName" (dict "root" . "component" "ui") | quote }}
   labels:
     {{- include "infegate.labels" . | nindent 4 }}
     app.kubernetes.io/component: ui
 spec:
+  strategy:
+    {{- toYaml .Values.ui.strategy | nindent 4 }}
   selector:
     matchLabels:
       {{- include "infegate.selectorLabels" (dict "root" . "component" "ui") | nindent 6 }}
@@ -14,8 +16,9 @@ spec:
       labels:
         {{- include "infegate.selectorLabels" (dict "root" . "component" "ui") | nindent 8 }}
     spec:
+      terminationGracePeriodSeconds: {{ .Values.ui.terminationGracePeriodSeconds }}
       automountServiceAccountToken: false
-      serviceAccountName: {{ include "infegate.serviceAccountName" . }}
+      serviceAccountName: {{ include "infegate.serviceAccountName" . | quote }}
       securityContext:
         {{- toYaml .Values.ui.podSecurityContext | nindent 8 }}
       {{- with .Values.imagePullSecrets }}
@@ -25,20 +28,18 @@ spec:
       containers:
         - name: ui
           image: {{ include "infegate.image" (dict "image" .Values.ui.image) | quote }}
-          imagePullPolicy: {{ .Values.ui.image.pullPolicy }}
+          imagePullPolicy: {{ .Values.ui.image.pullPolicy | quote }}
           securityContext:
             {{- toYaml .Values.ui.containerSecurityContext | nindent 12 }}
           ports:
             - name: http
               containerPort: 8080
+          startupProbe:
+            {{- toYaml .Values.ui.startupProbe | nindent 12 }}
           readinessProbe:
-            httpGet:
-              path: /healthz
-              port: http
+            {{- toYaml .Values.ui.readinessProbe | nindent 12 }}
           livenessProbe:
-            httpGet:
-              path: /healthz
-              port: http
+            {{- toYaml .Values.ui.livenessProbe | nindent 12 }}
           resources:
             {{- toYaml .Values.ui.resources | nindent 12 }}
           volumeMounts:
@@ -59,7 +60,23 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.ui.topologySpreadConstraints }}
+      {{- if or .Values.ui.defaultTopologySpread.enabled .Values.ui.topologySpreadConstraints }}
       topologySpreadConstraints:
+        {{- if .Values.ui.defaultTopologySpread.enabled }}
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "infegate.selectorLabels" (dict "root" . "component" "ui") | nindent 14 }}
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              {{- include "infegate.selectorLabels" (dict "root" . "component" "ui") | nindent 14 }}
+        {{- end }}
+        {{- with .Values.ui.topologySpreadConstraints }}
         {{- toYaml . | nindent 8 }}
+        {{- end }}
       {{- end }}

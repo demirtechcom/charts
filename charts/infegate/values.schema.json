@@ -30,9 +30,15 @@
     "api": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["autoscaling", "metrics", "image", "database", "management", "oidc", "runtime", "audit", "mcp", "subscriptionPassthrough", "resources", "podSecurityContext", "containerSecurityContext", "nodeSelector", "tolerations", "affinity", "topologySpreadConstraints"],
+      "required": ["autoscaling", "podDisruptionBudget", "strategy", "terminationGracePeriodSeconds", "startupProbe", "readinessProbe", "livenessProbe", "metrics", "image", "database", "management", "oidc", "runtime", "audit", "mcp", "subscriptionPassthrough", "resources", "podSecurityContext", "containerSecurityContext", "nodeSelector", "tolerations", "affinity", "topologySpreadConstraints", "defaultTopologySpread"],
       "properties": {
         "autoscaling": { "$ref": "#/definitions/autoscaling" },
+        "podDisruptionBudget": { "$ref": "#/definitions/podDisruptionBudget" },
+        "strategy": { "type": "object", "minProperties": 1 },
+        "terminationGracePeriodSeconds": { "type": "integer", "minimum": 1 },
+        "startupProbe": { "type": "object", "minProperties": 1 },
+        "readinessProbe": { "type": "object", "minProperties": 1 },
+        "livenessProbe": { "type": "object", "minProperties": 1 },
         "metrics": {
           "type": "object",
           "additionalProperties": false,
@@ -187,15 +193,22 @@
         "nodeSelector": { "type": "object", "additionalProperties": { "type": "string" } },
         "tolerations": { "type": "array", "items": { "type": "object" } },
         "affinity": { "type": "object" },
-        "topologySpreadConstraints": { "type": "array", "items": { "type": "object" } }
+        "topologySpreadConstraints": { "type": "array", "items": { "type": "object" } },
+        "defaultTopologySpread": { "$ref": "#/definitions/defaultTopologySpread" }
       }
     },
     "ui": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["autoscaling", "image", "resources", "podSecurityContext", "containerSecurityContext", "nodeSelector", "tolerations", "affinity", "topologySpreadConstraints"],
+      "required": ["autoscaling", "podDisruptionBudget", "strategy", "terminationGracePeriodSeconds", "startupProbe", "readinessProbe", "livenessProbe", "image", "resources", "podSecurityContext", "containerSecurityContext", "nodeSelector", "tolerations", "affinity", "topologySpreadConstraints", "defaultTopologySpread"],
       "properties": {
         "autoscaling": { "$ref": "#/definitions/autoscaling" },
+        "podDisruptionBudget": { "$ref": "#/definitions/podDisruptionBudget" },
+        "strategy": { "type": "object", "minProperties": 1 },
+        "terminationGracePeriodSeconds": { "type": "integer", "minimum": 1 },
+        "startupProbe": { "type": "object", "minProperties": 1 },
+        "readinessProbe": { "type": "object", "minProperties": 1 },
+        "livenessProbe": { "type": "object", "minProperties": 1 },
         "image": { "$ref": "#/definitions/image" },
         "resources": { "type": "object" },
         "podSecurityContext": { "type": "object" },
@@ -203,7 +216,8 @@
         "nodeSelector": { "type": "object", "additionalProperties": { "type": "string" } },
         "tolerations": { "type": "array", "items": { "type": "object" } },
         "affinity": { "type": "object" },
-        "topologySpreadConstraints": { "type": "array", "items": { "type": "object" } }
+        "topologySpreadConstraints": { "type": "array", "items": { "type": "object" } },
+        "defaultTopologySpread": { "$ref": "#/definitions/defaultTopologySpread" }
       }
     },
     "ingress": {
@@ -251,6 +265,21 @@
     }
   },
   "definitions": {
+    "defaultTopologySpread": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled"],
+      "properties": { "enabled": { "type": "boolean" } }
+    },
+    "podDisruptionBudget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "maxUnavailable"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "maxUnavailable": { "oneOf": [{ "type": "integer", "minimum": 0 }, { "type": "string", "pattern": "^(100|[0-9]{1,2})%$" }] }
+      }
+    },
     "autoscaling": {
       "type": "object",
       "additionalProperties": false,

@@ -41,8 +41,8 @@ grep -q 'name: infegate-api' "${work_dir}/default.yaml"
 grep -q 'name: infegate-ui' "${work_dir}/default.yaml"
 ! grep -q '^  replicas:' "${work_dir}/default.yaml"
 test "$(grep -c '^kind: HorizontalPodAutoscaler$' "${work_dir}/default.yaml")" -eq 2
-test "$(grep -c '^  minReplicas: 2$' "${work_dir}/default.yaml")" -eq 2
-test "$(grep -c '^  maxReplicas: 10$' "${work_dir}/default.yaml")" -eq 2
+test "$(grep -c '^  minReplicas: 3$' "${work_dir}/default.yaml")" -eq 2
+test "$(grep -c '^  maxReplicas: 30$' "${work_dir}/default.yaml")" -eq 2
 test "$(grep -c '^          averageUtilization: 70$' "${work_dir}/default.yaml")" -eq 2
 grep -q 'image: "ghcr.io/demirtechcom/infegate/gateway:1.0.6"' "${work_dir}/default.yaml"
 grep -q 'image: "ghcr.io/demirtechcom/infegate/ui:1.0.6"' "${work_dir}/default.yaml"
@@ -52,13 +52,24 @@ grep -q 'llm: metadata' "${work_dir}/default.yaml"
 ! grep -qi 'cloudflare\|lovie' "${work_dir}/default.yaml"
 grep -q 'mode: strict' "${work_dir}/default.yaml"
 grep -q 'name: OIDC_COOKIE_SECRET' "${work_dir}/default.yaml"
-test "$(grep -c 'path: /healthz/ready' "${work_dir}/default.yaml")" -eq 2
+test "$(grep -c 'path: /healthz/ready' "${work_dir}/default.yaml")" -eq 1
+test "$(grep -c '^          startupProbe:$' "${work_dir}/default.yaml")" -eq 2
+test "$(grep -c '^      terminationGracePeriodSeconds: 60$' "${work_dir}/default.yaml")" -eq 2
 grep -q 'automountServiceAccountToken: false' "${work_dir}/default.yaml"
 grep -q 'readOnlyRootFilesystem: true' "${work_dir}/default.yaml"
 grep -q 'statsAddr: "0.0.0.0:15020"' "${work_dir}/default.yaml"
 test "$(grep -c 'name: metrics' "${work_dir}/default.yaml")" -eq 2
 grep -q 'containerPort: 15020' "${work_dir}/default.yaml"
-! grep -q 'kind: PodDisruptionBudget' "${work_dir}/default.yaml"
+test "$(grep -c '^kind: PodDisruptionBudget$' "${work_dir}/default.yaml")" -eq 2
+test "$(grep -c '^  maxUnavailable: 1$' "${work_dir}/default.yaml")" -eq 2
+test "$(grep -c '^      maxUnavailable: 0$' "${work_dir}/default.yaml")" -eq 2
+test "$(grep -c '^      maxSurge: 1$' "${work_dir}/default.yaml")" -eq 2
+test "$(grep -c '^      topologySpreadConstraints:$' "${work_dir}/default.yaml")" -eq 2
+test "$(grep -c '^          topologyKey: topology.kubernetes.io/zone$' "${work_dir}/default.yaml")" -eq 2
+test "$(grep -c '^          topologyKey: kubernetes.io/hostname$' "${work_dir}/default.yaml")" -eq 2
+grep -q '^        checksum/config: "[a-f0-9]\{64\}"$' "${work_dir}/default.yaml"
+grep -q '^              ephemeral-storage: 256Mi$' "${work_dir}/default.yaml"
+grep -q '^              ephemeral-storage: 64Mi$' "${work_dir}/default.yaml"
 ! grep -q 'containerPort: 3001' "${work_dir}/default.yaml"
 ! grep -q 'containerPort: 3002' "${work_dir}/default.yaml"
 ! grep -q '^    mcp:$' "${work_dir}/default.yaml"
@@ -71,6 +82,15 @@ render \
   > "${work_dir}/autoscaling-disabled.yaml"
 ! grep -q '^kind: HorizontalPodAutoscaler$' "${work_dir}/autoscaling-disabled.yaml"
 ! grep -q '^  replicas:' "${work_dir}/autoscaling-disabled.yaml"
+
+render \
+  --set api.podDisruptionBudget.enabled=false \
+  --set ui.podDisruptionBudget.enabled=false \
+  --set api.defaultTopologySpread.enabled=false \
+  --set ui.defaultTopologySpread.enabled=false \
+  > "${work_dir}/ha-disabled.yaml"
+! grep -q '^kind: PodDisruptionBudget$' "${work_dir}/ha-disabled.yaml"
+! grep -q '^      topologySpreadConstraints:$' "${work_dir}/ha-disabled.yaml"
 
 render \
   --set api.autoscaling.targetMemoryUtilizationPercentage=80 \

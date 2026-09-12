@@ -1,21 +1,26 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "infegate.componentName" (dict "root" . "component" "api") }}
+  name: {{ include "infegate.componentName" (dict "root" . "component" "api") | quote }}
   labels:
     {{- include "infegate.labels" . | nindent 4 }}
     app.kubernetes.io/component: api
 spec:
+  strategy:
+    {{- toYaml .Values.api.strategy | nindent 4 }}
   selector:
     matchLabels:
       {{- include "infegate.selectorLabels" (dict "root" . "component" "api") | nindent 6 }}
   template:
     metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum | quote }}
       labels:
         {{- include "infegate.selectorLabels" (dict "root" . "component" "api") | nindent 8 }}
     spec:
+      terminationGracePeriodSeconds: {{ .Values.api.terminationGracePeriodSeconds }}
       automountServiceAccountToken: false
-      serviceAccountName: {{ include "infegate.serviceAccountName" . }}
+      serviceAccountName: {{ include "infegate.serviceAccountName" . | quote }}
       securityContext:
         {{- toYaml .Values.api.podSecurityContext | nindent 8 }}
       {{- with .Values.imagePullSecrets }}
@@ -25,30 +30,30 @@ spec:
       containers:
         - name: api
           image: {{ include "infegate.image" (dict "image" .Values.api.image) | quote }}
-          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          imagePullPolicy: {{ .Values.api.image.pullPolicy | quote }}
           args: ["-f", "/etc/infegate/config.yaml"]
           securityContext:
             {{- toYaml .Values.api.containerSecurityContext | nindent 12 }}
           envFrom:
             - secretRef:
-                name: {{ .Values.api.runtime.existingSecret }}
+                name: {{ .Values.api.runtime.existingSecret | quote }}
           env:
             - name: INFEGATE_DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.api.database.existingSecret }}
-                  key: {{ .Values.api.database.key }}
+                  name: {{ .Values.api.database.existingSecret | quote }}
+                  key: {{ .Values.api.database.key | quote }}
             {{- if eq .Values.api.management.authenticationMode "oidc" }}
             - name: INFEGATE_OIDC_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.api.oidc.existingSecret }}
-                  key: {{ .Values.api.oidc.clientSecretKey }}
+                  name: {{ .Values.api.oidc.existingSecret | quote }}
+                  key: {{ .Values.api.oidc.clientSecretKey | quote }}
             - name: OIDC_COOKIE_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.api.oidc.existingSecret }}
-                  key: {{ .Values.api.oidc.cookieSecretKey }}
+                  name: {{ .Values.api.oidc.existingSecret | quote }}
+                  key: {{ .Values.api.oidc.cookieSecretKey | quote }}
             {{- end }}
           ports:
             - name: llm
@@ -69,14 +74,12 @@ spec:
             - name: mcp
               containerPort: 3002
             {{- end }}
+          startupProbe:
+            {{- toYaml .Values.api.startupProbe | nindent 12 }}
           readinessProbe:
-            httpGet:
-              path: /healthz/ready
-              port: readiness
+            {{- toYaml .Values.api.readinessProbe | nindent 12 }}
           livenessProbe:
-            httpGet:
-              path: /healthz/ready
-              port: readiness
+            {{- toYaml .Values.api.livenessProbe | nindent 12 }}
           resources:
             {{- toYaml .Values.api.resources | nindent 12 }}
           volumeMounts:
@@ -88,7 +91,7 @@ spec:
       volumes:
         - name: config
           configMap:
-            name: {{ include "infegate.componentName" (dict "root" . "component" "api") }}
+            name: {{ include "infegate.componentName" (dict "root" . "component" "api") | quote }}
         - name: tmp
           emptyDir: {}
       {{- with .Values.api.nodeSelector }}
@@ -103,7 +106,23 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.api.topologySpreadConstraints }}
+      {{- if or .Values.api.defaultTopologySpread.enabled .Values.api.topologySpreadConstraints }}
       topologySpreadConstraints:
+        {{- if .Values.api.defaultTopologySpread.enabled }}
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "infegate.selectorLabels" (dict "root" . "component" "api") | nindent 14 }}
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              {{- include "infegate.selectorLabels" (dict "root" . "component" "api") | nindent 14 }}
+        {{- end }}
+        {{- with .Values.api.topologySpreadConstraints }}
         {{- toYaml . | nindent 8 }}
+        {{- end }}
       {{- end }}

@@ -2,7 +2,7 @@
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: {{ include "infegate.fullname" . }}
+  name: {{ include "infegate.fullname" . | quote }}
   labels:
     {{- include "infegate.labels" . | nindent 4 }}
   {{- with .Values.gateway.annotations }}
@@ -10,7 +10,7 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
-  gatewayClassName: {{ .Values.gateway.gatewayClassName }}
+  gatewayClassName: {{ .Values.gateway.gatewayClassName | quote }}
   listeners:
     - name: https
       hostname: {{ include "infegate.host" . | quote }}
@@ -21,5 +21,5 @@ spec:
         certificateRefs:
           - group: ""
             kind: Secret
-            name: {{ .Values.gateway.tls.existingSecret }}
+            name: {{ .Values.gateway.tls.existingSecret | quote }}
 {{- end }}

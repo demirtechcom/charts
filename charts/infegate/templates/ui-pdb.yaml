@@ -1,0 +1,14 @@
+{{- if .Values.ui.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "infegate.componentName" (dict "root" . "component" "ui") | quote }}
+  labels:
+    {{- include "infegate.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ui
+spec:
+  maxUnavailable: {{ .Values.ui.podDisruptionBudget.maxUnavailable }}
+  selector:
+    matchLabels:
+      {{- include "infegate.selectorLabels" (dict "root" . "component" "ui") | nindent 6 }}
+{{- end }}

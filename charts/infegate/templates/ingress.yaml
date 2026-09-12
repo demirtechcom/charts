@@ -2,7 +2,7 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "infegate.fullname" . }}
+  name: {{ include "infegate.fullname" . | quote }}
   labels:
     {{- include "infegate.labels" . | nindent 4 }}
   {{- with .Values.ingress.annotations }}
@@ -11,12 +11,12 @@ metadata:
   {{- end }}
 spec:
   {{- with .Values.ingress.className }}
-  ingressClassName: {{ . }}
+  ingressClassName: {{ . | quote }}
   {{- end }}
   tls:
     - hosts:
         - {{ include "infegate.host" . | quote }}
-      secretName: {{ .Values.ingress.tls.existingSecret }}
+      secretName: {{ .Values.ingress.tls.existingSecret | quote }}
   rules:
     - host: {{ include "infegate.host" . | quote }}
       http:
@@ -25,15 +25,15 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: {{ include "infegate.componentName" (dict "root" . "component" "api") }}
+                name: {{ include "infegate.componentName" (dict "root" . "component" "api") | quote }}
                 port:
                   number: 3000
           {{- range list "/ui" "/api" "/cel" }}
-          - path: {{ . }}
+          - path: {{ . | quote }}
             pathType: Prefix
             backend:
               service:
-                name: {{ include "infegate.componentName" (dict "root" $ "component" "api") }}
+                name: {{ include "infegate.componentName" (dict "root" $ "component" "api") | quote }}
                 port:
                   number: 4000
           {{- end }}
@@ -42,7 +42,7 @@ spec:
             pathType: Exact
             backend:
               service:
-                name: {{ include "infegate.componentName" (dict "root" . "component" "api") }}
+                name: {{ include "infegate.componentName" (dict "root" . "component" "api") | quote }}
                 port:
                   number: 4000
           {{- end }}
@@ -51,18 +51,18 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: {{ include "infegate.componentName" (dict "root" . "component" "api") }}
+                name: {{ include "infegate.componentName" (dict "root" . "component" "api") | quote }}
                 port:
                   number: 3001
           {{- end }}
           {{- if .Values.api.mcp.enabled }}
           {{- if eq .Values.api.mcp.authenticationMode "nativeOAuth" }}
           {{- range list "/.well-known/oauth-protected-resource/mcp" "/.well-known/oauth-authorization-server/mcp" }}
-          - path: {{ . }}
+          - path: {{ . | quote }}
             pathType: ImplementationSpecific
             backend:
               service:
-                name: {{ include "infegate.componentName" (dict "root" $ "component" "api") }}
+                name: {{ include "infegate.componentName" (dict "root" $ "component" "api") | quote }}
                 port:
                   number: 3002
           {{- end }}
@@ -71,7 +71,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: {{ include "infegate.componentName" (dict "root" . "component" "api") }}
+                name: {{ include "infegate.componentName" (dict "root" . "component" "api") | quote }}
                 port:
                   number: 3002
           {{- end }}
@@ -79,7 +79,7 @@ spec:
             pathType: Exact
             backend:
               service:
-                name: {{ include "infegate.componentName" (dict "root" . "component" "ui") }}
+                name: {{ include "infegate.componentName" (dict "root" . "component" "ui") | quote }}
                 port:
                   number: 80
 {{- end }}

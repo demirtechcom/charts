@@ -11,11 +11,50 @@ serviceAccount:
 api:
   autoscaling:
     enabled: true
-    minReplicas: 2
-    maxReplicas: 10
+    minReplicas: 3
+    maxReplicas: 30
     targetCPUUtilizationPercentage: 70
     targetMemoryUtilizationPercentage: null
-    behavior: {}
+    behavior:
+      scaleUp:
+        stabilizationWindowSeconds: 0
+        selectPolicy: Max
+        policies:
+          - type: Percent
+            value: 100
+            periodSeconds: 60
+          - type: Pods
+            value: 4
+            periodSeconds: 60
+      scaleDown:
+        stabilizationWindowSeconds: 300
+        policies:
+          - type: Percent
+            value: 25
+            periodSeconds: 60
+  podDisruptionBudget:
+    enabled: true
+    maxUnavailable: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  terminationGracePeriodSeconds: 60
+  startupProbe:
+    tcpSocket:
+      port: readiness
+    periodSeconds: 2
+    failureThreshold: 30
+  readinessProbe:
+    httpGet:
+      path: /healthz/ready
+      port: readiness
+    periodSeconds: 5
+  livenessProbe:
+    tcpSocket:
+      port: readiness
+    periodSeconds: 10
   metrics:
     enabled: true
     port: 15020
@@ -109,6 +148,10 @@ api:
     requests:
       cpu: 100m
       memory: 128Mi
+      ephemeral-storage: 64Mi
+    limits:
+      memory: 512Mi
+      ephemeral-storage: 256Mi
   podSecurityContext:
     runAsNonRoot: true
     seccompProfile:
@@ -122,15 +165,58 @@ api:
   tolerations: []
   affinity: {}
   topologySpreadConstraints: []
+  defaultTopologySpread:
+    enabled: true
 
 ui:
   autoscaling:
     enabled: true
-    minReplicas: 2
-    maxReplicas: 10
+    minReplicas: 3
+    maxReplicas: 30
     targetCPUUtilizationPercentage: 70
     targetMemoryUtilizationPercentage: null
-    behavior: {}
+    behavior:
+      scaleUp:
+        stabilizationWindowSeconds: 0
+        selectPolicy: Max
+        policies:
+          - type: Percent
+            value: 100
+            periodSeconds: 60
+          - type: Pods
+            value: 4
+            periodSeconds: 60
+      scaleDown:
+        stabilizationWindowSeconds: 300
+        policies:
+          - type: Percent
+            value: 25
+            periodSeconds: 60
+  podDisruptionBudget:
+    enabled: true
+    maxUnavailable: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  terminationGracePeriodSeconds: 60
+  startupProbe:
+    httpGet:
+      path: /healthz
+      port: http
+    periodSeconds: 2
+    failureThreshold: 30
+  readinessProbe:
+    httpGet:
+      path: /healthz
+      port: http
+    periodSeconds: 5
+  livenessProbe:
+    httpGet:
+      path: /healthz
+      port: http
+    periodSeconds: 10
   image:
     repository: ghcr.io/demirtechcom/infegate/ui
     tag: "1.0.6"
@@ -140,6 +226,10 @@ ui:
     requests:
       cpu: 10m
       memory: 32Mi
+      ephemeral-storage: 16Mi
+    limits:
+      memory: 128Mi
+      ephemeral-storage: 64Mi
   podSecurityContext:
     runAsNonRoot: true
     seccompProfile:
@@ -153,6 +243,8 @@ ui:
   tolerations: []
   affinity: {}
   topologySpreadConstraints: []
+  defaultTopologySpread:
+    enabled: true
 
 ingress:
   enabled: false

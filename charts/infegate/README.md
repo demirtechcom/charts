@@ -196,22 +196,34 @@ require an explicit `api.mcp.authorizationRule`.
 
 ## Autoscaling and pod placement
 
-API and UI HorizontalPodAutoscalers are enabled by default with two minimum and
-ten maximum replicas. Both use a 70 percent CPU utilization target and require
+API and UI HorizontalPodAutoscalers are enabled by default with three minimum and
+30 maximum replicas. Both use a 70 percent CPU utilization target and require
 Kubernetes resource metrics, normally provided by Metrics Server. Configure
 CPU, memory, and HPA scaling behavior independently under `api.autoscaling` and
-`ui.autoscaling`.
+`ui.autoscaling`. The default policy scales up immediately by up to 100 percent
+or four pods per minute and stabilizes scale-down for five minutes.
 
 Set `autoscaling.enabled: false` to let another controller or an operator manage
 replica counts. The Deployments do not render `spec.replicas` in either mode, so
 GitOps reconciliation does not overwrite the active scaler.
 
-Each workload exposes `nodeSelector`, `affinity`, `tolerations`, and
-`topologySpreadConstraints` for placement. `podSecurityContext` and
+Each workload spreads its replicas across zones and nodes by default and exposes
+`nodeSelector`, `affinity`, `tolerations`, and `topologySpreadConstraints` for
+additional placement rules. Disable the generated constraints with
+`defaultTopologySpread.enabled: false`. A PodDisruptionBudget permits one
+unavailable replica, while rolling updates permit one surge pod and no
+unavailable pods. `podSecurityContext` and
 `containerSecurityContext` are also configurable independently for API and UI.
 Their defaults require a non-root process, the runtime-default seccomp profile,
 no privilege escalation, a read-only root filesystem, and no Linux
 capabilities.
+
+Startup, readiness, and liveness probes are configured separately. API
+liveness checks only the local listener so a database outage does not restart
+every replica. Both workloads use a 60 second termination grace period. Resource
+defaults include memory and ephemeral-storage limits; CPU limits are omitted to
+avoid throttling latency-sensitive requests. The chart supports Kubernetes
+1.30 and newer.
 
 ## Image digest pinning
 
