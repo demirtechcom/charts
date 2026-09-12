@@ -45,17 +45,25 @@ grep -q 'image: "ghcr.io/demirtechcom/infegate/ui:1.0.6"' "${work_dir}/default.y
 grep -q 'url: \$INFEGATE_DATABASE_URL' "${work_dir}/default.yaml"
 grep -q 'mode: hybrid' "${work_dir}/default.yaml"
 grep -q 'llm: metadata' "${work_dir}/default.yaml"
+! grep -qi 'cloudflare\|lovie' "${work_dir}/default.yaml"
 grep -q 'mode: strict' "${work_dir}/default.yaml"
 grep -q 'name: OIDC_COOKIE_SECRET' "${work_dir}/default.yaml"
 test "$(grep -c 'path: /healthz/ready' "${work_dir}/default.yaml")" -eq 2
 grep -q 'automountServiceAccountToken: false' "${work_dir}/default.yaml"
 grep -q 'readOnlyRootFilesystem: true' "${work_dir}/default.yaml"
+grep -q 'statsAddr: "0.0.0.0:15020"' "${work_dir}/default.yaml"
+test "$(grep -c 'name: metrics' "${work_dir}/default.yaml")" -eq 2
+grep -q 'containerPort: 15020' "${work_dir}/default.yaml"
 ! grep -q 'kind: PodDisruptionBudget' "${work_dir}/default.yaml"
 ! grep -q 'containerPort: 3001' "${work_dir}/default.yaml"
 ! grep -q 'containerPort: 3002' "${work_dir}/default.yaml"
 ! grep -q '^    mcp:$' "${work_dir}/default.yaml"
 ! grep -q '^kind: Gateway$' "${work_dir}/default.yaml"
 ! grep -q '^kind: HTTPRoute$' "${work_dir}/default.yaml"
+
+render --set api.metrics.enabled=false > "${work_dir}/metrics-disabled.yaml"
+grep -q 'statsAddr: "off"' "${work_dir}/metrics-disabled.yaml"
+! grep -q 'name: metrics' "${work_dir}/metrics-disabled.yaml"
 
 render \
   --set api.mcp.enabled=true \
@@ -83,6 +91,50 @@ fi
 
 render --set api.audit.capturePayloads=true > "${work_dir}/payloads.yaml"
 grep -q 'llm: full' "${work_dir}/payloads.yaml"
+
+render \
+  --set api.management.authenticationMode=externalJwt \
+  --set-string api.oidc.issuer= \
+  --set-string api.oidc.clientId= \
+  --set-string api.oidc.existingSecret= \
+  --set-string api.oidc.authorizationRule= \
+  --set-string api.management.externalJwt.issuer=https://identity-proxy.customer.example \
+  --set-string 'api.management.externalJwt.audiences[0]=$INFEGATE_ADMIN_AUDIENCE' \
+  --set-string api.management.externalJwt.jwksUrl=https://identity-proxy.customer.example/.well-known/jwks.json \
+  --set-string api.management.externalJwt.headerName=X-Forwarded-Jwt \
+  --set-string 'api.management.externalJwt.authorizationRule=jwt.email != ""' \
+  --set api.mcp.enabled=true \
+  --set api.mcp.authenticationMode=externalJwt \
+  --set-string api.mcp.issuer=https://identity-proxy.customer.example \
+  --set-string api.mcp.headerName=X-Forwarded-Jwt \
+  --set-string api.mcp.jwksUrl=https://identity-proxy.customer.example/.well-known/jwks.json \
+  --set-string 'api.mcp.audiences[0]=$INFEGATE_MCP_AUDIENCE' \
+  --set-string 'api.mcp.authorizationRule=jwt.email != ""' \
+  --set api.audit.capturePayloads=true \
+  --set api.audit.captureMcpPayloads=true \
+  --set api.audit.retention.enabled=true \
+  --set gateway.enabled=true \
+  --set gateway.create=false \
+  --set-string gateway.parentRef.name=shared-gateway \
+  > "${work_dir}/external-jwt.yaml"
+test "$(grep -c 'name: "X-Forwarded-Jwt"' "${work_dir}/external-jwt.yaml")" -eq 2
+test "$(grep -c 'issuer: "https://identity-proxy.customer.example"' "${work_dir}/external-jwt.yaml")" -eq 2
+grep -q '^            - \$INFEGATE_ADMIN_AUDIENCE$' "${work_dir}/external-jwt.yaml"
+grep -q '^            - \$INFEGATE_MCP_AUDIENCE$' "${work_dir}/external-jwt.yaml"
+grep -q 'url: "https://identity-proxy.customer.example/.well-known/jwks.json"' "${work_dir}/external-jwt.yaml"
+test "$(grep -c 'requiredClaims: \[exp\]' "${work_dir}/external-jwt.yaml")" -eq 2
+grep -q 'mcp.tool.arguments: mcp.tool.arguments' "${work_dir}/external-jwt.yaml"
+grep -q 'mcp.tool.result: mcp.tool.result' "${work_dir}/external-jwt.yaml"
+grep -q 'mcp.tool.error: mcp.tool.error' "${work_dir}/external-jwt.yaml"
+grep -q '^kind: CronJob$' "${work_dir}/external-jwt.yaml"
+grep -q '^kind: HTTPRoute$' "${work_dir}/external-jwt.yaml"
+grep -q "INTERVAL '30 days'" "${work_dir}/external-jwt.yaml"
+grep -q "INTERVAL '365 days'" "${work_dir}/external-jwt.yaml"
+! grep -q '/oauth/callback' "${work_dir}/external-jwt.yaml"
+! grep -q '/.well-known/oauth-' "${work_dir}/external-jwt.yaml"
+! grep -q 'name: INFEGATE_OIDC_CLIENT_SECRET' "${work_dir}/external-jwt.yaml"
+! grep -q 'name: OIDC_COOKIE_SECRET' "${work_dir}/external-jwt.yaml"
+! grep -q 'keycloak: {}' "${work_dir}/external-jwt.yaml"
 
 render \
   --set api.subscriptionPassthrough.providers.claude.enabled=true \
@@ -159,25 +211,25 @@ grep -q '^    - "ai.customer.example"$' "${work_dir}/existing-gateway-port.yaml"
 grep -q 'redirectURI: "https://ai.customer.example:8443/oauth/callback"' "${work_dir}/existing-gateway-port.yaml"
 
 render \
-  --set-string publicUrl=https://ai-staging.lovietech.com \
+  --set-string publicUrl=https://ai.customer.example \
   --set gateway.enabled=true \
   --set gateway.create=false \
-  --set-string gateway.parentRef.name=lovie-gateway \
-  --set-string gateway.parentRef.namespace=lovie \
+  --set-string gateway.parentRef.name=shared-gateway \
+  --set-string gateway.parentRef.namespace=gateway-system \
   --set api.subscriptionPassthrough.providers.claude.enabled=true \
   --set api.mcp.enabled=true \
   --set-string api.mcp.jwksUrl=https://id.customer.example/realms/infegate/protocol/openid-connect/certs \
   --set-string api.mcp.audiences[0]=infegate \
   --set-string 'api.mcp.authorizationRule="infegate-mcp-users" in jwt.groups' \
-  > "${work_dir}/lovie-gateway.yaml"
-! grep -q '^kind: Gateway$' "${work_dir}/lovie-gateway.yaml"
-test "$(grep -c '^kind: HTTPRoute$' "${work_dir}/lovie-gateway.yaml")" -eq 1
-grep -q '^    - "ai-staging.lovietech.com"$' "${work_dir}/lovie-gateway.yaml"
-grep -A6 '^  parentRefs:$' "${work_dir}/lovie-gateway.yaml" | grep -q '^    - group: gateway.networking.k8s.io$'
-grep -A6 '^  parentRefs:$' "${work_dir}/lovie-gateway.yaml" | grep -q '^      kind: Gateway$'
-grep -A6 '^  parentRefs:$' "${work_dir}/lovie-gateway.yaml" | grep -q '^      name: lovie-gateway$'
-grep -A6 '^  parentRefs:$' "${work_dir}/lovie-gateway.yaml" | grep -q '^      namespace: lovie$'
-! grep -q 'sectionName:' "${work_dir}/lovie-gateway.yaml"
+  > "${work_dir}/shared-gateway.yaml"
+! grep -q '^kind: Gateway$' "${work_dir}/shared-gateway.yaml"
+test "$(grep -c '^kind: HTTPRoute$' "${work_dir}/shared-gateway.yaml")" -eq 1
+grep -q '^    - "ai.customer.example"$' "${work_dir}/shared-gateway.yaml"
+grep -A6 '^  parentRefs:$' "${work_dir}/shared-gateway.yaml" | grep -q '^    - group: gateway.networking.k8s.io$'
+grep -A6 '^  parentRefs:$' "${work_dir}/shared-gateway.yaml" | grep -q '^      kind: Gateway$'
+grep -A6 '^  parentRefs:$' "${work_dir}/shared-gateway.yaml" | grep -q '^      name: shared-gateway$'
+grep -A6 '^  parentRefs:$' "${work_dir}/shared-gateway.yaml" | grep -q '^      namespace: gateway-system$'
+! grep -q 'sectionName:' "${work_dir}/shared-gateway.yaml"
 
 assert_gateway_route() {
   path=$1
@@ -187,9 +239,9 @@ assert_gateway_route() {
   route_block="${work_dir}/route-block.yaml"
 
   if test "${path}" = /; then
-    grep -B2 -A8 'value: /$' "${work_dir}/lovie-gateway.yaml" > "${route_block}"
+    grep -B2 -A8 'value: /$' "${work_dir}/shared-gateway.yaml" > "${route_block}"
   else
-    grep -F -B2 -A8 "value: ${path}" "${work_dir}/lovie-gateway.yaml" > "${route_block}"
+    grep -F -B2 -A8 "value: ${path}" "${work_dir}/shared-gateway.yaml" > "${route_block}"
   fi
   grep -q "type: ${path_type}" "${route_block}"
   grep -q "name: ${service}" "${route_block}"
@@ -200,15 +252,15 @@ assert_gateway_route /v1 PathPrefix infegate-api 3000
 assert_gateway_route /ui PathPrefix infegate-api 4000
 assert_gateway_route /api PathPrefix infegate-api 4000
 assert_gateway_route /cel PathPrefix infegate-api 4000
-assert_gateway_route /oauth/callback PathPrefix infegate-api 4000
+assert_gateway_route /oauth/callback Exact infegate-api 4000
 assert_gateway_route /subscriptions/claude PathPrefix infegate-api 3001
 assert_gateway_route /.well-known/oauth-protected-resource/mcp Exact infegate-api 3002
 assert_gateway_route /.well-known/oauth-authorization-server/mcp Exact infegate-api 3002
 assert_gateway_route /mcp PathPrefix infegate-api 3002
 assert_gateway_route / Exact infegate-ui 80
-test "$(grep -c '^[[:space:]]*- group: ""$' "${work_dir}/lovie-gateway.yaml")" -eq 10
-test "$(grep -c '^          kind: Service$' "${work_dir}/lovie-gateway.yaml")" -eq 10
-test "$(grep -c '^          weight: 1$' "${work_dir}/lovie-gateway.yaml")" -eq 10
+test "$(grep -c '^[[:space:]]*- group: ""$' "${work_dir}/shared-gateway.yaml")" -eq 10
+test "$(grep -c '^          kind: Service$' "${work_dir}/shared-gateway.yaml")" -eq 10
+test "$(grep -c '^          weight: 1$' "${work_dir}/shared-gateway.yaml")" -eq 10
 
 render --set ingress.enabled=true \
   --set-string ingress.tls.existingSecret=infegate-tls \
@@ -284,6 +336,22 @@ expect_render_failure "publicUrl hostname must be a valid Gateway API hostname" 
 expect_render_failure "gateway.parentRef.name is required when using an existing Gateway" \
   --set gateway.enabled=true \
   --set gateway.create=false
+expect_render_failure "api.management.externalJwt.issuer is required when management uses external JWT" \
+  --set api.management.authenticationMode=externalJwt
+expect_render_failure "api.mcp.issuer is required when MCP uses external JWT" \
+  --set api.mcp.enabled=true \
+  --set api.mcp.authenticationMode=externalJwt \
+  --set-string api.mcp.jwksUrl=https://identity-proxy.customer.example/.well-known/jwks.json \
+  --set-string api.mcp.audiences[0]=infegate \
+  --set-string api.mcp.authorizationRule=true
+expect_render_failure "api.audit.retention.metadataDays must be greater than payloadDays" \
+  --set api.audit.retention.enabled=true \
+  --set api.audit.retention.payloadDays=30 \
+  --set api.audit.retention.metadataDays=30
+for reserved_port in 3000 3001 3002 4000 15021; do
+  expect_render_failure "api.metrics.port conflicts with a reserved Infegate listener port" \
+    --set api.metrics.port="${reserved_port}"
+done
 if render --set api.subscriptionPassthrough.providers.openai.enabled=true >/dev/null 2>&1; then
   echo "unknown passthrough providers must fail schema validation" >&2
   exit 1
@@ -291,7 +359,7 @@ fi
 
 readonly release_workflow=.github/workflows/release.yaml
 readonly checkout='actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2'
-grep -q '^version: 1.1.0$' "${chart}/Chart.yaml"
+grep -q '^version: 1.2.0$' "${chart}/Chart.yaml"
 grep -q '^appVersion: "1.0.6"$' "${chart}/Chart.yaml"
 if grep -Eq 'test "\$\{VERSION\}" = "[0-9]+\.[0-9]+\.[0-9]+"' "${release_workflow}"; then
   echo "chart release workflow must validate the dispatched version against Chart.yaml, not a hardcoded release" >&2

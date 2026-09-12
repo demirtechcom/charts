@@ -30,6 +30,11 @@ while IFS= read -r chart_file; do
   if test -x "${chart_test}"; then
     "${chart_test}"
   fi
+
+  retention_test="./scripts/test-${chart_name}-retention.sh"
+  if test -x "${retention_test}"; then
+    "${retention_test}"
+  fi
 done
 
 if ! find charts -mindepth 2 -maxdepth 2 -name Chart.yaml -print -quit | grep -q .; then

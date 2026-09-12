@@ -28,12 +28,21 @@ spec:
                 name: {{ include "infegate.componentName" (dict "root" . "component" "api") }}
                 port:
                   number: 3000
-          {{- range list "/ui" "/api" "/cel" "/oauth/callback" }}
+          {{- range list "/ui" "/api" "/cel" }}
           - path: {{ . }}
             pathType: Prefix
             backend:
               service:
                 name: {{ include "infegate.componentName" (dict "root" $ "component" "api") }}
+                port:
+                  number: 4000
+          {{- end }}
+          {{- if eq .Values.api.management.authenticationMode "oidc" }}
+          - path: /oauth/callback
+            pathType: Exact
+            backend:
+              service:
+                name: {{ include "infegate.componentName" (dict "root" . "component" "api") }}
                 port:
                   number: 4000
           {{- end }}
@@ -47,6 +56,7 @@ spec:
                   number: 3001
           {{- end }}
           {{- if .Values.api.mcp.enabled }}
+          {{- if eq .Values.api.mcp.authenticationMode "nativeOAuth" }}
           {{- range list "/.well-known/oauth-protected-resource/mcp" "/.well-known/oauth-authorization-server/mcp" }}
           - path: {{ . }}
             pathType: ImplementationSpecific
@@ -55,6 +65,7 @@ spec:
                 name: {{ include "infegate.componentName" (dict "root" $ "component" "api") }}
                 port:
                   number: 3002
+          {{- end }}
           {{- end }}
           - path: /mcp
             pathType: Prefix

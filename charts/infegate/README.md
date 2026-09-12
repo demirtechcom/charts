@@ -3,15 +3,14 @@
 This chart installs Infegate as one product with two independent workloads:
 `infegate-api` runs the pinned agentgateway runtime and `infegate-ui` serves the
 branded static interface. Both use an external PostgreSQL database. The chart
-does not install PostgreSQL, CloudNativePG, an OIDC provider, certificates, or
+does not install PostgreSQL, a database operator, an OIDC provider, certificates, or
 an Ingress or Gateway API controller, or Gateway API CRDs.
 
 ## Install
 
-Chart 1.1.0 packages Infegate 1.0.6, which supports clean installations and
-upgrades from 1.0.0 through 1.0.5. Prepare three distinct
-Secrets for the database URL, OIDC credentials, and runtime provider
-credentials, then install with explicit audit retention behavior:
+Chart 1.2.0 packages Infegate 1.0.6. Prepare separate Secrets for the database
+URL and runtime provider credentials. Native OIDC also needs its own Secret.
+Choose the authentication mode and audit behavior explicitly:
 
 ```yaml
 publicUrl: https://ai.customer.example
@@ -44,7 +43,7 @@ ingress:
 
 ```sh
 helm install infegate oci://ghcr.io/demirtechcom/charts/infegate \
-  --version 1.1.0 --namespace infegate --create-namespace -f values.yaml
+  --version 1.2.0 --namespace infegate --create-namespace -f values.yaml
 ```
 
 ## Native OIDC
@@ -57,6 +56,34 @@ bytes encoded as 64 hexadecimal characters. Register
 Authentication alone does not grant administration access. Every install must
 provide `api.oidc.authorizationRule`, a fail-closed CEL allow expression. `/ui`,
 `/api`, and `/cel` share the same origin and encrypted session cookie.
+
+## External JWT
+
+Set `api.management.authenticationMode: externalJwt` when an edge proxy owns
+the login flow. Infegate then validates the token again at the origin, including
+its signature, issuer, audience, and required expiry claim. OIDC credentials
+and `/oauth/callback` are omitted in this mode.
+
+Configure the issuer, audience, JWKS endpoint, and header used by the upstream
+identity-aware proxy:
+
+```yaml
+api:
+  management:
+    authenticationMode: externalJwt
+    externalJwt:
+      issuer: https://identity-proxy.customer.example
+      audiences:
+        - "$INFEGATE_ADMIN_AUDIENCE"
+      jwksUrl: https://identity-proxy.customer.example/.well-known/jwks.json
+      headerName: X-Forwarded-Jwt
+      authorizationRule: 'jwt.email != ""'
+```
+
+Put audience values in the runtime Secret and reference their environment
+variables as shown. This keeps deployment-specific identifiers out of
+the values file and avoids repeating the administrator email list at the
+origin.
 
 ## Virtual API keys
 
@@ -108,9 +135,9 @@ rendered. Claude is the only supported subscription provider in 1.0.x.
 
 ## PostgreSQL
 
-PostgreSQL is mandatory and is not bundled. CloudNativePG is recommended; its
-`[cluster]-app` Secret already provides the default `uri` key expected by the
-chart. The database URL is injected as `INFEGATE_DATABASE_URL` and the ConfigMap
+PostgreSQL is mandatory and is not bundled. Provide its connection URI in the
+Secret key selected by `api.database.key`, which defaults to `uri`. The database
+URL is injected as `INFEGATE_DATABASE_URL` and the ConfigMap
 contains only `$INFEGATE_DATABASE_URL`, so `/api/config` cannot expose the
 credential. Both API replicas share hybrid configuration, logs, costs, and
 virtual keys through this database.
@@ -119,16 +146,53 @@ Set `api.audit.capturePayloads: false` to retain metadata, usage, timing, and
 cost without prompts or completions. Set it to `true` only when full content
 retention is approved.
 
+Set `api.audit.captureMcpPayloads: true` to record MCP tool arguments, results,
+and errors. The default sensitive-header list redacts authorization headers,
+cookies, Infegate keys, and common provider API-key headers
+from trace and debug output.
+
+The optional retention CronJob deletes LLM and MCP payloads before deleting
+their metadata:
+
+```yaml
+api:
+  audit:
+    retention:
+      enabled: true
+      schedule: "17 3 * * *"
+      payloadDays: 30
+      metadataDays: 365
+```
+
+Retention only changes the online database. Backups can preserve deleted rows
+until their own retention window expires.
+
+The retention container runs as PostgreSQL's standard UID and GID 70 by
+default. Override `api.audit.retention.securityContext.runAsUser` and
+`runAsGroup` when the selected image uses different numeric IDs. The database
+URI is passed through `PGDATABASE`, so it does not appear in the process command
+line.
+
+## Metrics
+
+Prometheus metrics are enabled by default on the API Service's named `metrics`
+port at `15020`. Set `api.metrics.enabled: false` to render `statsAddr: off` and
+remove the metrics ports from the Deployment and Service. The metric names and
+labels follow the bundled agentgateway version. Scrapers should drop sensitive
+or unbounded labels such as user, email, API key, and request ID.
+
 ## MCP
 
 Set `api.mcp.enabled: true` to enable PostgreSQL-backed MCP configuration in
 hybrid mode. The chart renders an empty target catalog so MCP servers remain
 managed through Infegate instead of an unrestricted raw gateway configuration.
 MCP listens on the dedicated internal port 3002 and is published at `/mcp` when
-Ingress is enabled. Strict MCP authentication verifies Keycloak JWT signatures
-through `api.mcp.jwksUrl`, and `api.mcp.authorizationRule` must explicitly
-authorize each request. `api.mcp.audiences` must match an audience emitted in
-the Keycloak access token.
+Ingress or Gateway API routing is enabled. The default `nativeOAuth` mode uses
+the OIDC issuer and publishes the MCP discovery routes. The `externalJwt` mode
+expects an upstream OAuth service, reads its
+signed assertion from the configured header, and does not expose Infegate's
+native discovery routes. Both modes verify the configured JWKS and audience and
+require an explicit `api.mcp.authorizationRule`.
 
 ## Image digest pinning
 
@@ -148,9 +212,10 @@ mandatory.
 | `/` | UI | 80 |
 | `/v1` | API | 3000 |
 | `/mcp` when enabled | API | 3002 |
-| `/.well-known/oauth-protected-resource/mcp` when MCP is enabled | API | 3002 |
-| `/.well-known/oauth-authorization-server/mcp` when MCP is enabled | API | 3002 |
-| `/ui`, `/api`, `/cel`, `/oauth/callback` | API | 4000 |
+| `/.well-known/oauth-protected-resource/mcp` with native MCP OAuth | API | 3002 |
+| `/.well-known/oauth-authorization-server/mcp` with native MCP OAuth | API | 3002 |
+| `/ui`, `/api`, `/cel` | API | 4000 |
+| `/oauth/callback` with native management OIDC | API | 4000 |
 | `/subscriptions/claude` when enabled | API | 3001 |
 
 The exact root path serves the public Infegate landing page. The UI Service
@@ -194,64 +259,12 @@ The cluster must already have the Gateway API CRDs and a controller. See the
 and [TLS configuration guide](https://gateway-api.sigs.k8s.io/guides/user-guides/tls/)
 for the resources and listener model used by the chart.
 
-### Lovie staging
-
-Lovie's `lovie-gateway` accepts HTTPRoutes from every namespace on its HTTP
-listener. TLS terminates at Cloudflare or the NLB layer, so Infegate only needs
-to attach its HTTPRoute:
-
-```yaml
-publicUrl: https://ai-staging.lovietech.com
-
-gateway:
-  enabled: true
-  create: false
-  parentRef:
-    name: lovie-gateway
-    namespace: lovie
-```
-
-| Function | URL |
-| --- | --- |
-| LLM API | `https://ai-staging.lovietech.com/v1` |
-| Management UI | `https://ai-staging.lovietech.com/ui/` |
-| MCP, when enabled | `https://ai-staging.lovietech.com/mcp` |
-| Claude subscription, when enabled | `https://ai-staging.lovietech.com/subscriptions/claude` |
-
-The staging wildcard DNS already sends this hostname pattern to the tunnel.
-Production uses `https://ai.lovie.co`, but `ai` is not yet in Lovie's production
-hostname list. Add the production DNS record and tunnel ingress entry before
-using that hostname.
-
-Lovie's Gateway-level Clerk JWT policy would reject Infegate virtual API keys
-and its own OIDC flow. Apply a route-level Envoy Gateway SecurityPolicy in the
-Infegate namespace to leave authentication to Infegate. The policy must target
-the rendered HTTPRoute name, which is `infegate` for the example release:
-
-```yaml
-apiVersion: gateway.envoyproxy.io/v1alpha1
-kind: SecurityPolicy
-metadata:
-  name: infegate-auth
-  namespace: infegate
-spec:
-  targetRefs:
-    - group: gateway.networking.k8s.io
-      kind: HTTPRoute
-      name: infegate
-```
-
-Envoy Gateway gives a route-level policy precedence over a Gateway-level policy
-when `mergeType` is unset. The chart does not render this resource because
-SecurityPolicy is specific to Envoy Gateway. See the
-[Envoy Gateway SecurityPolicy precedence rules](https://gateway.envoyproxy.io/docs/concepts/gateway_api_extensions/security-policy/).
-
 ## Upgrade
 
-Version 1.0.6 supports upgrades from 1.0.0 through 1.0.5. There is no supported upgrade path
-from the UI-only 0.1.0 chart or an independent agentgateway deployment. New
-installations require a clean namespace and PostgreSQL database. Render and
-inspect the target chart and its two digests before upgrading.
+Chart 1.2.0 keeps native OIDC as the default, so existing 1.1.0 values continue
+to render without an authentication migration. New installations require a
+clean namespace and PostgreSQL database. Render and inspect the target chart
+and its two image digests before upgrading.
 
 ## Rollback
 

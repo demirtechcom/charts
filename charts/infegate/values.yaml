@@ -10,6 +10,9 @@ serviceAccount:
 
 api:
   replicaCount: 2
+  metrics:
+    enabled: true
+    port: 15020
   image:
     repository: ghcr.io/demirtechcom/infegate/gateway
     tag: "1.0.6"
@@ -19,6 +22,14 @@ api:
     existingSecret: ""
     key: uri
     maxConnections: 5
+  management:
+    authenticationMode: oidc
+    externalJwt:
+      issuer: ""
+      audiences: []
+      jwksUrl: ""
+      headerName: X-Forwarded-Jwt
+      authorizationRule: ""
   oidc:
     issuer: ""
     clientId: ""
@@ -33,8 +44,41 @@ api:
     existingSecret: ""
   audit:
     capturePayloads: null
+    captureMcpPayloads: false
+    sensitiveHeaders:
+      - authorization
+      - proxy-authorization
+      - cookie
+      - set-cookie
+      - x-infegate-key
+      - x-api-key
+      - api-key
+      - x-goog-api-key
+    retention:
+      enabled: false
+      schedule: "17 3 * * *"
+      payloadDays: 30
+      metadataDays: 365
+      securityContext:
+        runAsUser: 70
+        runAsGroup: 70
+      image:
+        repository: postgres
+        tag: 18-alpine
+        digest: ""
+        pullPolicy: IfNotPresent
+      resources:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          cpu: 100m
+          memory: 128Mi
   mcp:
     enabled: false
+    authenticationMode: nativeOAuth
+    issuer: ""
+    headerName: X-Forwarded-Jwt
     jwksUrl: ""
     audiences: []
     authorizationRule: ""

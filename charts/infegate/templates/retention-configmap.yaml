@@ -1,0 +1,40 @@
+{{- if .Values.api.audit.retention.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "infegate.componentName" (dict "root" . "component" "retention") }}
+  labels:
+    {{- include "infegate.labels" . | nindent 4 }}
+    app.kubernetes.io/component: retention
+data:
+  retention.sql: |
+    \set ON_ERROR_STOP on
+    BEGIN;
+
+    DELETE FROM request_log_payloads AS payload
+    USING request_logs AS log
+    WHERE payload.log_id = log.id
+      AND log.completed_at < CURRENT_TIMESTAMP - INTERVAL '{{ .Values.api.audit.retention.payloadDays }} days';
+
+    UPDATE request_logs
+    SET has_payload = false,
+        attributes_json = attributes_json - ARRAY[
+          'mcp.tool.arguments',
+          'mcp.tool.result',
+          'mcp.tool.error'
+        ]::text[]
+    WHERE completed_at < CURRENT_TIMESTAMP - INTERVAL '{{ .Values.api.audit.retention.payloadDays }} days'
+      AND (
+        has_payload
+        OR attributes_json ?| ARRAY[
+          'mcp.tool.arguments',
+          'mcp.tool.result',
+          'mcp.tool.error'
+        ]
+      );
+
+    DELETE FROM request_logs
+    WHERE completed_at < CURRENT_TIMESTAMP - INTERVAL '{{ .Values.api.audit.retention.metadataDays }} days';
+
+    COMMIT;
+{{- end }}

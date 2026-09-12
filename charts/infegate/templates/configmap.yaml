@@ -11,6 +11,9 @@ data:
     config:
       adminAddr: 127.0.0.1:15000
       readinessAddr: 0.0.0.0:15021
+      statsAddr: {{ ternary (printf "0.0.0.0:%v" .Values.api.metrics.port) "off" .Values.api.metrics.enabled | quote }}
+      sensitiveHeaders:
+        {{- toYaml .Values.api.audit.sensitiveHeaders | nindent 8 }}
       database:
         url: $INFEGATE_DATABASE_URL
         maxConnections: {{ .Values.api.database.maxConnections }}
@@ -23,11 +26,18 @@ data:
       accessLog:
         database:
           llm: {{ ternary "full" "metadata" .Values.api.audit.capturePayloads }}
+          {{- if .Values.api.audit.captureMcpPayloads }}
+          add:
+            mcp.tool.arguments: mcp.tool.arguments
+            mcp.tool.result: mcp.tool.result
+            mcp.tool.error: mcp.tool.error
+          {{- end }}
     gateways:
       api:
         port: 3000
       management:
         port: 4000
+        {{- if eq .Values.api.management.authenticationMode "oidc" }}
         oidc:
           issuer: {{ .Values.api.oidc.issuer | quote }}
           clientId: {{ .Values.api.oidc.clientId | quote }}
@@ -35,9 +45,28 @@ data:
           redirectURI: {{ printf "%s/oauth/callback" .Values.publicUrl | quote }}
           scopes:
             {{- toYaml .Values.api.oidc.scopes | nindent 12 }}
+        {{- else }}
+        jwtAuth:
+          mode: strict
+          location:
+            header:
+              name: {{ .Values.api.management.externalJwt.headerName | quote }}
+          preserveToken: false
+          issuer: {{ .Values.api.management.externalJwt.issuer | quote }}
+          audiences:
+            {{- toYaml .Values.api.management.externalJwt.audiences | nindent 12 }}
+          jwks:
+            url: {{ .Values.api.management.externalJwt.jwksUrl | quote }}
+          jwtValidationOptions:
+            requiredClaims: [exp]
+        {{- end }}
         authorization:
           rules:
+            {{- if eq .Values.api.management.authenticationMode "oidc" }}
             - allow: {{ .Values.api.oidc.authorizationRule | quote }}
+            {{- else }}
+            - allow: {{ .Values.api.management.externalJwt.authorizationRule | quote }}
+            {{- end }}
       {{- if .Values.api.subscriptionPassthrough.providers.claude.enabled }}
       subscriptions:
         port: 3001
@@ -71,13 +100,22 @@ data:
             - Mcp-Session-Id
         mcpAuthentication:
           mode: strict
-          issuer: {{ .Values.api.oidc.issuer | quote }}
+          {{- if eq .Values.api.mcp.authenticationMode "externalJwt" }}
+          authorizationLocation:
+            header:
+              name: {{ .Values.api.mcp.headerName | quote }}
+          {{- end }}
+          issuer: {{ ternary .Values.api.mcp.issuer .Values.api.oidc.issuer (eq .Values.api.mcp.authenticationMode "externalJwt") | quote }}
           audiences:
             {{- toYaml .Values.api.mcp.audiences | nindent 12 }}
           jwks:
             url: {{ .Values.api.mcp.jwksUrl | quote }}
+          jwtValidationOptions:
+            requiredClaims: [exp]
+          {{- if eq .Values.api.mcp.authenticationMode "nativeOAuth" }}
           provider:
             keycloak: {}
+          {{- end }}
           resourceMetadata:
             resource: {{ printf "%s/mcp" .Values.publicUrl | quote }}
             scopesSupported:
@@ -105,8 +143,10 @@ data:
               pathPrefix: /api
           - path:
               pathPrefix: /cel
+          {{- if eq .Values.api.management.authenticationMode "oidc" }}
           - path:
               exact: /oauth/callback
+          {{- end }}
         backends:
           - internal: forward
       {{- with .Values.api.subscriptionPassthrough.providers.claude }}
