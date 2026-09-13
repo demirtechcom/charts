@@ -63,7 +63,7 @@ api:
     port: 15020
   image:
     repository: ghcr.io/demirtechcom/infegate/gateway
-    tag: "1.0.6"
+    tag: "1.1.0"
     digest: ""
     pullPolicy: IfNotPresent
   database:
@@ -96,6 +96,8 @@ api:
     session:
       enabled: false
       header: x-infegate-session
+    costDetail:
+      enabled: false
     sensitiveHeaders:
       - authorization
       - proxy-authorization
@@ -228,7 +230,7 @@ ui:
     periodSeconds: 10
   image:
     repository: ghcr.io/demirtechcom/infegate/ui
-    tag: "1.0.6"
+    tag: "1.1.0"
     digest: ""
     pullPolicy: IfNotPresent
   resources:

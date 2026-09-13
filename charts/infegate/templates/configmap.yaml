@@ -26,8 +26,12 @@ data:
       accessLog:
         database:
           llm: {{ ternary "full" "metadata" .Values.api.audit.capturePayloads }}
-          {{- if or .Values.api.audit.captureMcpPayloads .Values.api.audit.session.enabled }}
+          {{- if or .Values.api.audit.captureMcpPayloads .Values.api.audit.session.enabled .Values.api.audit.costDetail.enabled }}
           add:
+            {{- if .Values.api.audit.costDetail.enabled }}
+            infegate.cost.rates: llm.costRates
+            infegate.cost.amounts: llm.cost
+            {{- end }}
             {{- if .Values.api.audit.session.enabled }}
             {{- $header := .Values.api.audit.session.header }}
             session: {{ printf "request.headers[%q] == null ? null : string(apiKey.metadata[\"owner\"] == null ? \"anonymous\" : apiKey.metadata[\"owner\"]) + \":\" + request.headers[%q]" $header $header | quote }}
