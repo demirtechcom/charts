@@ -8,7 +8,7 @@ an Ingress or Gateway API controller, or Gateway API CRDs.
 
 ## Install
 
-Chart 2.0.0 packages Infegate 1.0.6. Prepare separate Secrets for the database
+Chart 2.2.0 packages Infegate 1.1.0. Prepare separate Secrets for the database
 URL and runtime provider credentials. Native OIDC also needs its own Secret.
 Choose the authentication mode and audit behavior explicitly:
 
@@ -43,7 +43,7 @@ ingress:
 
 ```sh
 helm install infegate oci://ghcr.io/demirtechcom/charts/infegate \
-  --version 2.0.0 --namespace infegate --create-namespace -f values.yaml
+  --version 2.2.0 --namespace infegate --create-namespace -f values.yaml
 ```
 
 ## Native OIDC
@@ -259,7 +259,7 @@ merging. Deployment strategy behaves the same way: setting `strategy.type` to
 
 ## Image digest pinning
 
-Source `values.yaml` uses 1.0.6 tags. The published OCI chart is packaged with
+Source `values.yaml` uses 1.1.0 tags. The published OCI chart is packaged with
 the immutable UI and gateway digests produced by the Infegate release. Private
 or offline installations may override each repository while retaining its
 digest.
