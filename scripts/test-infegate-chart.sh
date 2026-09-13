@@ -44,8 +44,8 @@ test "$(grep -c '^kind: HorizontalPodAutoscaler$' "${work_dir}/default.yaml")" -
 test "$(grep -c '^  minReplicas: 3$' "${work_dir}/default.yaml")" -eq 2
 test "$(grep -c '^  maxReplicas: 30$' "${work_dir}/default.yaml")" -eq 2
 test "$(grep -c '^          averageUtilization: 70$' "${work_dir}/default.yaml")" -eq 2
-grep -q 'image: "ghcr.io/demirtechcom/infegate/gateway:1.0.6"' "${work_dir}/default.yaml"
-grep -q 'image: "ghcr.io/demirtechcom/infegate/ui:1.0.6"' "${work_dir}/default.yaml"
+grep -q 'image: "ghcr.io/demirtechcom/infegate/gateway:1.1.0"' "${work_dir}/default.yaml"
+grep -q 'image: "ghcr.io/demirtechcom/infegate/ui:1.1.0"' "${work_dir}/default.yaml"
 grep -q 'url: \$INFEGATE_DATABASE_URL' "${work_dir}/default.yaml"
 grep -q 'mode: hybrid' "${work_dir}/default.yaml"
 grep -q 'llm: metadata' "${work_dir}/default.yaml"
@@ -204,6 +204,21 @@ grep -q "INTERVAL '365 days'" "${work_dir}/external-jwt.yaml"
 ! grep -q 'name: INFEGATE_OIDC_CLIENT_SECRET' "${work_dir}/external-jwt.yaml"
 ! grep -q 'name: OIDC_COOKIE_SECRET' "${work_dir}/external-jwt.yaml"
 ! grep -q 'keycloak: {}' "${work_dir}/external-jwt.yaml"
+
+# Both audit attribute flags default off, so the whole add: block stays out of a
+# default render rather than being emitted empty.
+! grep -q 'infegate.cost.rates' "${work_dir}/default.yaml"
+! grep -q '^            session:' "${work_dir}/default.yaml"
+
+render \
+  --set api.audit.costDetail.enabled=true \
+  --set api.audit.session.enabled=true \
+  > "${work_dir}/audit-attributes.yaml"
+# The Infegate log detail view reads the request cost from exactly these two
+# attribute names; renaming either one silently unprices every request it shows.
+grep -q 'infegate.cost.rates: llm.costRates' "${work_dir}/audit-attributes.yaml"
+grep -q 'infegate.cost.amounts: llm.cost' "${work_dir}/audit-attributes.yaml"
+grep -q 'session: "request.headers\[\\"x-infegate-session\\"\]' "${work_dir}/audit-attributes.yaml"
 
 render \
   --set api.subscriptionPassthrough.providers.claude.enabled=true \
@@ -446,8 +461,8 @@ fi
 
 readonly release_workflow=.github/workflows/release.yaml
 readonly checkout='actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2'
-grep -q '^version: 2.0.0$' "${chart}/Chart.yaml"
-grep -q '^appVersion: "1.0.6"$' "${chart}/Chart.yaml"
+grep -q '^version: 2.2.0$' "${chart}/Chart.yaml"
+grep -q '^appVersion: "1.1.0"$' "${chart}/Chart.yaml"
 if grep -Eq 'test "\$\{VERSION\}" = "[0-9]+\.[0-9]+\.[0-9]+"' "${release_workflow}"; then
   echo "chart release workflow must validate the dispatched version against Chart.yaml, not a hardcoded release" >&2
   exit 1
