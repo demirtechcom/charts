@@ -266,6 +266,7 @@
             "capturePayloads",
             "captureMcpPayloads",
             "session",
+            "costDetail",
             "sensitiveHeaders",
             "retention"
           ],
@@ -293,6 +294,18 @@
                 "header": {
                   "type": "string",
                   "pattern": "^[!#$%&'*+.^_`|~0-9A-Za-z-]+$"
+                }
+              }
+            },
+            "costDetail": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "enabled"
+              ],
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
                 }
               }
             },

@@ -96,6 +96,8 @@ api:
     session:
       enabled: false
       header: x-infegate-session
+    costDetail:
+      enabled: false
     sensitiveHeaders:
       - authorization
       - proxy-authorization

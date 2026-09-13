@@ -169,6 +169,14 @@ header itself is client-controlled input: bound its length and character set at
 the edge before turning this on, and prefer an opaque id over anything that
 carries customer data.
 
+Set `api.audit.costDetail.enabled: true` to record how a request was priced. The
+gateway keeps only the total on the record; the applied per-1M rates and the
+per-component amounts go to traces. This records both on the request itself, so
+the console can show which rates were charged and can tell an unpriced request
+apart from a free one.
+
+Rates are catalog data, not customer data, and no token content is involved.
+
 The optional retention CronJob deletes LLM and MCP payloads before deleting
 their metadata:
 

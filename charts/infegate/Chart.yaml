@@ -3,7 +3,7 @@ name: infegate
 description: Infegate auditable AI gateway and management interface
 type: application
 kubeVersion: ">=1.30.0-0"
-version: 2.1.0
+version: 2.2.0
 appVersion: "1.0.6"
 home: https://infegate.com
 sources:
