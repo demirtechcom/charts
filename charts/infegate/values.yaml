@@ -93,6 +93,9 @@ api:
   audit:
     capturePayloads: null
     captureMcpPayloads: false
+    session:
+      enabled: false
+      header: x-infegate-session
     sensitiveHeaders:
       - authorization
       - proxy-authorization

@@ -26,11 +26,17 @@ data:
       accessLog:
         database:
           llm: {{ ternary "full" "metadata" .Values.api.audit.capturePayloads }}
-          {{- if .Values.api.audit.captureMcpPayloads }}
+          {{- if or .Values.api.audit.captureMcpPayloads .Values.api.audit.session.enabled }}
           add:
+            {{- if .Values.api.audit.session.enabled }}
+            {{- $header := .Values.api.audit.session.header }}
+            session: {{ printf "request.headers[%q] == null ? null : string(apiKey.metadata[\"owner\"] == null ? \"anonymous\" : apiKey.metadata[\"owner\"]) + \":\" + request.headers[%q]" $header $header | quote }}
+            {{- end }}
+            {{- if .Values.api.audit.captureMcpPayloads }}
             mcp.tool.arguments: mcp.tool.arguments
             mcp.tool.result: mcp.tool.result
             mcp.tool.error: mcp.tool.error
+            {{- end }}
           {{- end }}
     gateways:
       api:

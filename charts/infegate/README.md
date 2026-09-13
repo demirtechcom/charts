@@ -157,6 +157,18 @@ and errors. The default sensitive-header list redacts authorization headers,
 cookies, Infegate keys, and common provider API-key headers
 from trace and debug output.
 
+Set `api.audit.session.enabled: true` to record which session a request belongs
+to. Each request is stamped with the value of `api.audit.session.header`, which
+defaults to `x-infegate-session`, and log search can then filter an entire
+session by that attribute. The client chooses the value and holds it for the life
+of a session; a request without the header is stamped with nothing.
+
+The stored value is the authenticated consumer joined to the header, so two
+clients that happen to choose the same id can never be read as one session. The
+header itself is client-controlled input: bound its length and character set at
+the edge before turning this on, and prefer an opaque id over anything that
+carries customer data.
+
 The optional retention CronJob deletes LLM and MCP payloads before deleting
 their metadata:
 
