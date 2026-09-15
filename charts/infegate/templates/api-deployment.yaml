@@ -42,6 +42,10 @@ spec:
             - secretRef:
                 name: {{ .Values.api.runtime.existingSecret | quote }}
           env:
+            - name: CONNECTION_MIN_TERMINATION_DEADLINE
+              value: {{ printf "%ds" (int .Values.api.connectionDrain.minSeconds) | quote }}
+            - name: CONNECTION_TERMINATION_DEADLINE
+              value: {{ printf "%ds" (int .Values.api.connectionDrain.maxSeconds) | quote }}
             - name: INFEGATE_DATABASE_URL
               valueFrom:
                 secretKeyRef:

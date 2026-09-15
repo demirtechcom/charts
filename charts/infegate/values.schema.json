@@ -86,7 +86,8 @@
         "tolerations",
         "affinity",
         "topologySpreadConstraints",
-        "defaultTopologySpread"
+        "defaultTopologySpread",
+        "connectionDrain"
       ],
       "properties": {
         "autoscaling": {
@@ -101,6 +102,24 @@
         "terminationGracePeriodSeconds": {
           "type": "integer",
           "minimum": 1
+        },
+        "connectionDrain": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "minSeconds",
+            "maxSeconds"
+          ],
+          "properties": {
+            "minSeconds": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "maxSeconds": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
         },
         "startupProbe": {
           "$ref": "#/definitions/probe"

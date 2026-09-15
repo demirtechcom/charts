@@ -8,7 +8,7 @@ an Ingress or Gateway API controller, or Gateway API CRDs.
 
 ## Install
 
-Chart 2.3.0 packages Infegate 1.1.0. Prepare separate Secrets for the database
+Chart 2.4.0 packages Infegate 1.1.0. Prepare separate Secrets for the database
 URL and runtime provider credentials. Native OIDC also needs its own Secret.
 Choose the authentication mode and audit behavior explicitly:
 
@@ -43,7 +43,7 @@ ingress:
 
 ```sh
 helm install infegate oci://ghcr.io/demirtechcom/charts/infegate \
-  --version 2.3.0 --namespace infegate --create-namespace -f values.yaml
+  --version 2.4.0 --namespace infegate --create-namespace -f values.yaml
 ```
 
 ## Native OIDC
@@ -148,6 +148,25 @@ from spending the subscription quickly.
 
 When Claude passthrough is disabled, port 3001 and its Ingress route are not
 rendered. Claude is the only supported subscription provider in 1.0.x.
+
+## Rollouts and in-flight requests
+
+agentgateway drains on SIGTERM: it tells clients to go away through GOAWAY and
+`connection: close`, then keeps serving what is already open. How long it keeps
+serving comes from its environment, and with nothing there it assumes five
+seconds. A streamed completion usually outlives that, so the client sees the
+answer stop mid-sentence and reports a lost connection rather than a restart.
+
+Kubernetes does not expose `terminationGracePeriodSeconds` to the container, so
+`api.connectionDrain` passes the budget in. `minSeconds` is how long the pod
+keeps accepting new connections after the signal, which covers the gap before
+its endpoint is removed everywhere. `maxSeconds` is how long it then waits for
+what is still in flight. Their sum must stay below
+`api.terminationGracePeriodSeconds`, and the chart refuses to render otherwise,
+because SIGKILL would drop exactly the connections the drain exists to protect.
+
+A generation longer than `maxSeconds` is still cut. Raise both that and the
+grace period together if your completions run longer than the default 50s.
 
 ## PostgreSQL
 
