@@ -41,6 +41,23 @@ api:
       maxUnavailable: 0
       maxSurge: 1
   terminationGracePeriodSeconds: 60
+  # agentgateway drains on SIGTERM, but only for as long as it believes it has.
+  # With neither of these in its environment it assumes 5 seconds and cuts
+  # whatever is still running, which for a streamed completion is the answer
+  # mid-sentence. Kubernetes does not expose terminationGracePeriodSeconds to
+  # the container, so the chart has to pass the budget in itself.
+  connectionDrain:
+    # Keep accepting new connections for this long after SIGTERM, while telling
+    # clients to go away through GOAWAY and `connection: close`. Endpoint
+    # removal is not instant, so a proxy can still route here for a moment
+    # after the signal, and refusing those connections is what the client sees
+    # as a reset.
+    minSeconds: 5
+    # Then stop accepting and wait this long for what is still in flight.
+    # Together with minSeconds this must stay under
+    # terminationGracePeriodSeconds, or Kubernetes sends SIGKILL and the
+    # connections are dropped rather than closed.
+    maxSeconds: 50
   startupProbe:
     type: tcpSocket
     tcpSocket:

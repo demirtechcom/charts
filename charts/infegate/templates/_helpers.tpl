@@ -60,6 +60,7 @@ app.kubernetes.io/component: {{ .component | quote }}
 {{- if eq .Values.api.audit.capturePayloads nil }}{{ fail "api.audit.capturePayloads must be explicitly true or false" }}{{ end }}
 {{- if and .Values.api.metrics.enabled (has (int .Values.api.metrics.port) (list 3000 3001 3002 4000 15021)) }}{{ fail "api.metrics.port conflicts with a reserved Infegate listener port" }}{{ end }}
 {{- if gt (int .Values.api.autoscaling.minReplicas) (int .Values.api.autoscaling.maxReplicas) }}{{ fail "api.autoscaling.minReplicas must not exceed maxReplicas" }}{{ end }}
+{{- if ge (add (int .Values.api.connectionDrain.minSeconds) (int .Values.api.connectionDrain.maxSeconds)) (int .Values.api.terminationGracePeriodSeconds) }}{{ fail "api.connectionDrain.minSeconds plus maxSeconds must be less than api.terminationGracePeriodSeconds, or Kubernetes sends SIGKILL before the drain finishes" }}{{ end }}
 {{- if and .Values.api.autoscaling.enabled (not (or .Values.api.autoscaling.targetCPUUtilizationPercentage .Values.api.autoscaling.targetMemoryUtilizationPercentage)) }}{{ fail "api.autoscaling requires at least one utilization target" }}{{ end }}
 {{- if gt (int .Values.ui.autoscaling.minReplicas) (int .Values.ui.autoscaling.maxReplicas) }}{{ fail "ui.autoscaling.minReplicas must not exceed maxReplicas" }}{{ end }}
 {{- if and .Values.ui.autoscaling.enabled (not (or .Values.ui.autoscaling.targetCPUUtilizationPercentage .Values.ui.autoscaling.targetMemoryUtilizationPercentage)) }}{{ fail "ui.autoscaling requires at least one utilization target" }}{{ end }}

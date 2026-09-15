@@ -484,9 +484,24 @@ if render --set api.subscriptionPassthrough.providers.openai.enabled=true >/dev/
   exit 1
 fi
 
+# agentgateway drains on SIGTERM, but assumes 5 seconds when its environment
+# says nothing, which cuts a streamed completion mid-answer on every rollout.
+# Kubernetes does not expose terminationGracePeriodSeconds to the container, so
+# these two env vars are the only way it learns the real budget.
+grep -q '^              value: "5s"$' "${work_dir}/default.yaml"
+grep -q '^              value: "50s"$' "${work_dir}/default.yaml"
+grep -q '^            - name: CONNECTION_MIN_TERMINATION_DEADLINE$' "${work_dir}/default.yaml"
+grep -q '^            - name: CONNECTION_TERMINATION_DEADLINE$' "${work_dir}/default.yaml"
+# The drain has to finish inside the grace period, or SIGKILL drops exactly the
+# connections the drain existed to protect.
+expect_render_failure 'api.connectionDrain.minSeconds plus maxSeconds must be less than api.terminationGracePeriodSeconds' \
+  --set api.connectionDrain.minSeconds=10 \
+  --set api.connectionDrain.maxSeconds=50 \
+  --set api.terminationGracePeriodSeconds=60
+
 readonly release_workflow=.github/workflows/release.yaml
 readonly checkout='actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2'
-grep -q '^version: 2.3.0$' "${chart}/Chart.yaml"
+grep -q '^version: 2.4.0$' "${chart}/Chart.yaml"
 grep -q '^appVersion: "1.1.0"$' "${chart}/Chart.yaml"
 if grep -Eq 'test "\$\{VERSION\}" = "[0-9]+\.[0-9]+\.[0-9]+"' "${release_workflow}"; then
   echo "chart release workflow must validate the dispatched version against Chart.yaml, not a hardcoded release" >&2
