@@ -241,6 +241,31 @@ grep -Fq '                  "*": passthrough' "${work_dir}/claude.yaml"
 ! grep -q 'host: api.anthropic.com:443' "${work_dir}/claude.yaml"
 grep -q 'name: x-infegate-key' "${work_dir}/claude.yaml"
 grep -q 'keyHash: "\$CLAUDE_TEAM_A_KEY_HASH"' "${work_dir}/claude.yaml"
+# Without an explicit buffer policy agentgateway falls back to its own 2 MiB
+# ceiling and answers 413, which ends a long Claude Code session. The default
+# here is Anthropic's own 32 MiB cap on the Messages API.
+grep -q '^          buffer:$' "${work_dir}/claude.yaml"
+grep -q '^              maxBytes: 33554432$' "${work_dir}/claude.yaml"
+# A drained bucket stays empty for one whole fillInterval, so the interval is
+# what decides how long a rate-limited client waits, not just the ceiling.
+grep -q '^              tokensPerFill: 100$' "${work_dir}/claude.yaml"
+grep -q '^              fillInterval: "1m"$' "${work_dir}/claude.yaml"
+
+render \
+  --set api.subscriptionPassthrough.providers.claude.enabled=true \
+  --set api.subscriptionPassthrough.providers.claude.maxRequestBytes=1048576 \
+  > "${work_dir}/claude-buffer.yaml"
+grep -q '^              maxBytes: 1048576$' "${work_dir}/claude-buffer.yaml"
+
+# 32 MiB is the ceiling Anthropic itself enforces; a larger body cannot succeed
+# upstream, so admitting one only buys an OOM risk in exchange for a 413.
+if render \
+  --set api.subscriptionPassthrough.providers.claude.enabled=true \
+  --set api.subscriptionPassthrough.providers.claude.maxRequestBytes=33554433 \
+  >/dev/null 2>&1; then
+  echo "expected a request body limit above 32 MiB to be rejected" >&2
+  exit 1
+fi
 
 render --set ingress.enabled=true \
   --set-string ingress.tls.existingSecret=infegate-tls \
@@ -461,7 +486,7 @@ fi
 
 readonly release_workflow=.github/workflows/release.yaml
 readonly checkout='actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2'
-grep -q '^version: 2.2.0$' "${chart}/Chart.yaml"
+grep -q '^version: 2.3.0$' "${chart}/Chart.yaml"
 grep -q '^appVersion: "1.1.0"$' "${chart}/Chart.yaml"
 if grep -Eq 'test "\$\{VERSION\}" = "[0-9]+\.[0-9]+\.[0-9]+"' "${release_workflow}"; then
   echo "chart release workflow must validate the dispatched version against Chart.yaml, not a hardcoded release" >&2

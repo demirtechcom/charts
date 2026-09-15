@@ -185,6 +185,9 @@ data:
           urlRewrite:
             path:
               prefix: /
+          buffer:
+            request:
+              maxBytes: {{ int .maxRequestBytes }}
           {{- if .rateLimit.enabled }}
           localRateLimit:
             - maxTokens: {{ .rateLimit.requestsPerInterval }}
