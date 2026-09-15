@@ -8,7 +8,7 @@ an Ingress or Gateway API controller, or Gateway API CRDs.
 
 ## Install
 
-Chart 2.2.0 packages Infegate 1.1.0. Prepare separate Secrets for the database
+Chart 2.3.0 packages Infegate 1.1.0. Prepare separate Secrets for the database
 URL and runtime provider credentials. Native OIDC also needs its own Secret.
 Choose the authentication mode and audit behavior explicitly:
 
@@ -43,7 +43,7 @@ ingress:
 
 ```sh
 helm install infegate oci://ghcr.io/demirtechcom/charts/infegate \
-  --version 2.2.0 --namespace infegate --create-namespace -f values.yaml
+  --version 2.3.0 --namespace infegate --create-namespace -f values.yaml
 ```
 
 ## Native OIDC
@@ -129,6 +129,22 @@ api:
               name: team-a
               owner: platform-team
 ```
+
+Two limits apply to the route. `maxRequestBytes` caps the request body and
+defaults to 33554432, which is Anthropic's own cap on the Messages API. It
+cannot be raised past that, because a larger body cannot succeed upstream, and
+it is set explicitly because agentgateway's own ceiling is 2 MiB. A client that
+resends a growing conversation, as Claude Code does on every turn, crosses that
+ceiling mid-session and is answered 413 from then on. The body is held in
+memory while it is priced and audited, so `api.resources.limits.memory` bounds
+how many large requests a replica can carry at once.
+
+`rateLimit` is a token bucket held per replica, not per installation, and
+`requestsPerInterval` fills it once per `interval` rather than continuously. A
+drained bucket therefore stays empty for the rest of the interval, so a long
+interval decides how long a throttled client waits. The default of 100 per
+minute stays far above an interactive client's rate while keeping a leaked key
+from spending the subscription quickly.
 
 When Claude passthrough is disabled, port 3001 and its Ingress route are not
 rendered. Claude is the only supported subscription provider in 1.0.x.

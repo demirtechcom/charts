@@ -148,17 +148,35 @@ api:
       claude:
         enabled: false
         accessKeys: []
+        # A Claude Code turn resends the whole conversation, so the request body
+        # grows with the session rather than with the prompt. agentgateway holds
+        # an LLM request body in memory to price and audit it, and its own
+        # default ceiling is 2 MiB, above which it answers 413 and the session
+        # cannot continue. 32 MiB is Anthropic's cap on the Messages API, so a
+        # larger body cannot succeed upstream either. Raising this without
+        # raising `api.resources.limits.memory` moves the failure from a 413 to
+        # an OOMKill.
+        maxRequestBytes: 33554432
+        # A token bucket, held per replica rather than per installation. Keep the
+        # interval short: `tokensPerFill` and `fillInterval` come from these two
+        # fields, so a long interval means a drained bucket stays empty for that
+        # whole interval, and a client that refills once an hour is locked out
+        # for the rest of it. 100 per minute leaves a leaked key unable to spend
+        # much while staying far above what an interactive client asks for.
         rateLimit:
           enabled: true
-          requestsPerInterval: 300
-          interval: 1h
+          requestsPerInterval: 100
+          interval: 1m
   resources:
     requests:
       cpu: 100m
       memory: 128Mi
       ephemeral-storage: 64Mi
     limits:
-      memory: 512Mi
+      # Room for the buffered request bodies admitted by
+      # `api.subscriptionPassthrough.providers.claude.maxRequestBytes`, whose
+      # parsed form is several times the bytes on the wire.
+      memory: 1Gi
       ephemeral-storage: 256Mi
   podSecurityContext:
     runAsNonRoot: true
